@@ -20,6 +20,10 @@ export function createGiftRouter(controller: GiftController): Router {
 		controller.getGiftHistory(req, res);
 	});
 
+	router.get("/:id/sticker", (req: Request, res: Response) => {
+		controller.getGiftSticker(req, res);
+	});
+
 	router.post("/update", async (req: Request, res: Response) => {
 		try {
 			const result = await controller.updateGifts();

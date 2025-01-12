@@ -3,7 +3,8 @@ import { Database } from "sqlite";
 import { fetchGifts } from "../services/telegramService";
 import { Gift, TelegramGiftResponse } from "../models/Gift";
 import { AnalyticsService } from "../services/analyticsService";
-
+import axios from "axios";
+import { TELEGRAM_BOT_TOKEN } from "../utils/constants";
 interface ExistingGift {
 	telegram_id: string;
 }
@@ -172,17 +173,27 @@ export class GiftController {
 		try {
 			const [gift, lastPurchase] = await Promise.all([
 				this.db.get<Gift>(
-					"SELECT * FROM gifts WHERE telegram_id = ?",
+					`SELECT 
+                        telegram_id,
+                        custom_emoji_id,
+                        emoji,
+                        star_count,
+                        remaining_count,
+                        total_count,
+                        status,
+                        last_updated
+                    FROM gifts 
+                    WHERE telegram_id = ?`,
 					req.params.id
 				),
 				this.db.get(
 					`SELECT 
-            change_amount,
-            last_updated as last_purchase
-           FROM gifts_history 
-           WHERE telegram_id = ? AND change_amount > 0
-           ORDER BY last_updated DESC 
-           LIMIT 1`,
+                        change_amount,
+                        last_updated as last_purchase
+                    FROM gifts_history 
+                    WHERE telegram_id = ? AND change_amount > 0
+                    ORDER BY last_updated DESC 
+                    LIMIT 1`,
 					req.params.id
 				),
 			]);
@@ -393,20 +404,50 @@ export class GiftController {
 		}
 	}
 
-	private calculateHourlyStats(history: any[]) {
-		const hourlyMap = new Map<string, number>();
+	async getGiftSticker(req: Request, res: Response) {
+		try {
+			const giftId = req.params.id;
 
-		history.forEach((record) => {
-			const hour = new Date(record.last_updated).getHours();
-			const currentAmount = hourlyMap.get(hour.toString()) || 0;
-			hourlyMap.set(hour.toString(), currentAmount + record.amount);
-		});
+			const gift = await this.db.get<Gift>(
+				"SELECT file_id, thumbnail_file_id, thumb_file_id FROM gifts WHERE telegram_id = ?",
+				giftId
+			);
 
-		return Array.from(hourlyMap.entries())
-			.map(([hour, amount]) => ({
-				hour: parseInt(hour),
-				amount,
-			}))
-			.sort((a, b) => a.hour - b.hour);
+			if (!gift) {
+				return res.status(404).json({ error: "Gift not found" });
+			}
+
+			try {
+				const response = await axios.get(
+					`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile`,
+					{
+						params: {
+							file_id: gift.file_id,
+						},
+					}
+				);
+
+				if (response.data.ok) {
+					const filePath = response.data.result.file_path;
+					const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${filePath}`;
+
+					res.json({
+						file_url: fileUrl,
+						thumbnail_file_id: gift.thumbnail_file_id,
+						thumb_file_id: gift.thumb_file_id,
+					});
+				} else {
+					res.status(400).json({ error: "Failed to get sticker file" });
+				}
+			} catch (error) {
+				console.error("Telegram API error:", error);
+				res
+					.status(500)
+					.json({ error: "Failed to fetch sticker from Telegram" });
+			}
+		} catch (error) {
+			console.error("Error getting gift sticker:", error);
+			res.status(500).json({ error: "Failed to get sticker information" });
+		}
 	}
 }

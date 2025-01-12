@@ -1,3 +1,4 @@
+// src/index.ts
 import express from "express";
 import cors from "cors";
 import { initializeDatabase } from "./config/database";
@@ -11,6 +12,7 @@ async function startServer() {
 	app.use(express.json());
 
 	const db = await initializeDatabase();
+	console.log("Database initialized successfully");
 	const giftController = new GiftController(db);
 
 	let previousGiftCounts = new Map<string, number>();
