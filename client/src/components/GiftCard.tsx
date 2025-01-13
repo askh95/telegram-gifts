@@ -18,7 +18,8 @@ export const GiftCard = ({ gift, onClick }: GiftCardProps) => {
 		<div
 			onClick={() => onClick(gift.telegram_id)}
 			className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50 
-                 hover:border-gray-600/50 transition-all cursor-pointer"
+        hover:border-gray-600/50 hover:scale-[1.02] hover:shadow-xl hover:shadow-blue-500/10 
+        transition-all duration-300 ease-out cursor-pointer"
 		>
 			<div className="flex items-start gap-6">
 				<div className="relative w-32 h-32 flex-shrink-0">
