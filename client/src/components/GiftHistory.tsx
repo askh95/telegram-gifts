@@ -38,7 +38,7 @@ export const GiftHistory = ({ history }: GiftHistoryProps) => {
 						</style>
 
 						<div className="flex items-center justify-between">
-							<span className="text-gray-300 text-sm sm:text-xs">
+							<span className="text-gray-300 text-xs sm:text-sm">
 								{item.last_updated} <u>UTC +0</u>
 							</span>
 							<span className="text-sm font-medium">{item.emoji}</span>

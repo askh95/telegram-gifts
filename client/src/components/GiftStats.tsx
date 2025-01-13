@@ -52,7 +52,7 @@ export const GiftStats = ({ hourlyStats }: GiftStatsProps) => {
 
 	return (
 		<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-4 sm:p-6 shadow-lg border border-gray-700/50">
-			<h3 className="text-lg sm:text-xs font-bold text-white mb-2 sm:mb-4">
+			<h3 className="text-base sm:text-lg font-bold text-white mb-2 sm:mb-4">
 				Почасовые покупки <u>UTC +0</u>
 			</h3>
 			<div className="h-[200px] sm:h-[250px] md:h-[300px]">

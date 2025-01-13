@@ -14,7 +14,7 @@ export const Navbar = () => {
 		<nav className="bg-gray-900/1 backdrop-blur-sm border-b border-gray-800 sticky top-0 z-50">
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 				<div className="flex items-center justify-between h-16 sm:h-20 md:h-24">
-					<div className="flex items-center">
+					<NavLink to="/" className="flex items-center">
 						<img
 							src={logo}
 							alt="Logo"
@@ -23,7 +23,7 @@ export const Navbar = () => {
 						<span className="ml-2 text-[10px] sm:text-xs font-semibold text-blue-500 bg-blue-500/10 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md">
 							BETA
 						</span>
-					</div>
+					</NavLink>
 
 					<div className="hidden md:flex flex-1 justify-center items-center gap-16">
 						<NavLink
