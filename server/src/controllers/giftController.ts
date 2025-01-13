@@ -1,12 +1,15 @@
+// src/controllers/giftController.ts
 import { Request, Response } from "express";
 import { Database } from "sqlite";
 import { fetchGifts } from "../services/telegramService";
 import { Gift, TelegramGiftResponse } from "../models/Gift";
 import { AnalyticsService } from "../services/analyticsService";
 import axios from "axios";
-import { TELEGRAM_BOT_TOKEN } from "../utils/constants";
+import { STATS_UPDATE_INTERVAL, TELEGRAM_BOT_TOKEN } from "../utils/constants";
 interface ExistingGift {
 	telegram_id: string;
+	remaining_count: number;
+	total_count: number;
 }
 
 interface PaginationQuery {
@@ -29,60 +32,92 @@ export class GiftController {
 
 	async updateGifts() {
 		try {
-			const gifts = await fetchGifts();
-			const existingGifts = await this.db.all<ExistingGift[]>(
-				"SELECT telegram_id FROM gifts"
+			const activeGifts = await this.db.all<ExistingGift[]>(
+				"SELECT telegram_id, remaining_count, total_count FROM gifts WHERE status = 'active'"
 			);
-			const existingIds = new Set(
-				existingGifts.map((g: ExistingGift) => g.telegram_id)
+
+			const currentGifts = await fetchGifts();
+			const currentGiftIds = new Set(
+				currentGifts.map((g: TelegramGiftResponse) => g.id)
 			);
 
 			const timestamp = new Date().toISOString();
 
-			for (const gift of gifts) {
-				if (existingIds.has(gift.id)) {
-					const currentGift = await this.db.get<Gift>(
-						"SELECT remaining_count FROM gifts WHERE telegram_id = ?",
-						gift.id
+			for (const activeGift of activeGifts) {
+				if (!currentGiftIds.has(activeGift.telegram_id)) {
+					console.log(
+						`Gift ${activeGift.telegram_id} disappeared from API, marking as sold out`
 					);
 
-					if (
-						currentGift &&
-						currentGift.remaining_count !== gift.remaining_count
-					) {
+					await this.db.run(
+						`UPDATE gifts 
+                        SET status = 'sold_out',
+                            remaining_count = 0,
+                            last_updated = CURRENT_TIMESTAMP
+                        WHERE telegram_id = ?`,
+						[activeGift.telegram_id]
+					);
+
+					await this.db.run(
+						`INSERT INTO gifts_history (
+                            telegram_id,
+                            remaining_count,
+                            total_count,
+                            change_amount,
+                            last_updated
+                        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+						[
+							activeGift.telegram_id,
+							0,
+							activeGift.total_count,
+							activeGift.remaining_count,
+						]
+					);
+				}
+			}
+
+			for (const gift of currentGifts) {
+				const existingGift = activeGifts.find((g) => g.telegram_id === gift.id);
+
+				if (existingGift) {
+					if (existingGift.remaining_count !== gift.remaining_count) {
 						await this.db.run(
 							`UPDATE gifts 
-               SET remaining_count = ?,
-                   last_updated = CURRENT_TIMESTAMP
-               WHERE telegram_id = ?`,
+                            SET remaining_count = ?,
+                                last_updated = CURRENT_TIMESTAMP
+                            WHERE telegram_id = ?`,
 							[gift.remaining_count, gift.id]
 						);
 
 						await this.db.run(
 							`INSERT INTO gifts_history (
-                telegram_id, 
-                remaining_count, 
-                total_count,
-                change_amount,
-                last_updated
-              ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                                telegram_id,
+                                remaining_count,
+                                total_count,
+                                change_amount,
+                                last_updated
+                            ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
 							[
 								gift.id,
 								gift.remaining_count,
 								gift.total_count,
-								currentGift.remaining_count - gift.remaining_count,
+								existingGift.remaining_count - gift.remaining_count,
 							]
 						);
 					}
 				} else {
 					await this.db.run(
 						`INSERT INTO gifts (
-              telegram_id, custom_emoji_id, emoji, file_id, 
-              file_size, file_unique_id, height, width,
-              is_animated, is_video, star_count, 
-              remaining_count, total_count, status,
-              created_at, last_updated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            telegram_id, custom_emoji_id, emoji, file_id,
+                            file_size, file_unique_id, height, width,
+                            is_animated, is_video, star_count,
+                            remaining_count, total_count, status,
+                            thumbnail_file_id, thumbnail_file_unique_id,
+                            thumbnail_file_size, thumbnail_width, thumbnail_height,
+                            thumb_file_id, thumb_file_unique_id,
+                            thumb_file_size, thumb_width, thumb_height,
+                            last_updated
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
 						[
 							gift.id,
 							gift.sticker.custom_emoji_id,
@@ -98,36 +133,30 @@ export class GiftController {
 							gift.remaining_count,
 							gift.total_count,
 							"active",
-							timestamp,
-							timestamp,
+							gift.sticker.thumbnail?.file_id,
+							gift.sticker.thumbnail?.file_unique_id,
+							gift.sticker.thumbnail?.file_size,
+							gift.sticker.thumbnail?.width,
+							gift.sticker.thumbnail?.height,
+							gift.sticker.thumb?.file_id,
+							gift.sticker.thumb?.file_unique_id,
+							gift.sticker.thumb?.file_size,
+							gift.sticker.thumb?.width,
+							gift.sticker.thumb?.height,
 						]
 					);
 
 					await this.db.run(
 						`INSERT INTO gifts_history (
-              telegram_id, 
-              remaining_count, 
-              total_count,
-              change_amount,
-              last_updated
-            ) VALUES (?, ?, ?, ?, ?)`,
-						[gift.id, gift.remaining_count, gift.total_count, 0, timestamp]
+                            telegram_id,
+                            remaining_count,
+                            total_count,
+                            change_amount,
+                            last_updated
+                        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+						[gift.id, gift.remaining_count, gift.total_count, 0]
 					);
 				}
-			}
-
-			const currentIds = gifts.map((g: TelegramGiftResponse) => g.id);
-			if (currentIds.length > 0) {
-				const placeholders = currentIds.map(() => "?").join(",");
-				await this.db.run(
-					`UPDATE gifts 
-           SET status = 'sold_out', 
-               remaining_count = 0,
-               last_updated = CURRENT_TIMESTAMP
-           WHERE telegram_id NOT IN (${placeholders})
-             AND status = 'active'`,
-					[...currentIds]
-				);
 			}
 		} catch (error) {
 			console.error("Error updating gifts:", error);
@@ -228,27 +257,57 @@ export class GiftController {
 
 			const purchaseHistory = await this.db.all(
 				`
+                WITH time_slots AS (
+                    SELECT 
+                        datetime(
+                            (strftime('%s', datetime('now', '-24 hours')) / (? / 1000)) * (? / 1000),
+                            'unixepoch'
+                        ) as slot_start,
+                        ? / 1000 as slot_duration
+                    UNION ALL
+                    SELECT 
+                        datetime(
+                            strftime('%s', slot_start) + slot_duration,
+                            'unixepoch'
+                        ),
+                        slot_duration
+                    FROM time_slots
+                    WHERE datetime(slot_start) < datetime('now')
+                    LIMIT 288  -- 24 hours * 12 intervals per hour (5 min intervals)
+                )
                 SELECT 
-                    datetime(last_updated) as timestamp,
-                    remaining_count,
-                    total_count,
-                    change_amount,
-                    strftime('%H', last_updated) as hour
-                FROM gifts_history 
-                WHERE telegram_id = ?
-                    AND change_amount > 0
-                    AND last_updated >= datetime('now', '-24 hours')
-                ORDER BY last_updated ASC
+                    time_slots.slot_start as timestamp,
+                    COALESCE(SUM(gh.change_amount), 0) as change_amount,
+                    MAX(gh.remaining_count) as remaining_count,
+                    MIN(gh.remaining_count) as min_remaining_count,
+                    gh.total_count
+                FROM time_slots
+                LEFT JOIN gifts_history gh ON 
+                    datetime(gh.last_updated) >= datetime(time_slots.slot_start) AND 
+                    datetime(gh.last_updated) < datetime(
+                        time_slots.slot_start, 
+                        '+' || (? / 1000) || ' seconds'
+                    ) AND
+                    gh.telegram_id = ?
+                GROUP BY time_slots.slot_start
+                ORDER BY time_slots.slot_start ASC
                 `,
-				[giftId]
+				[
+					STATS_UPDATE_INTERVAL,
+					STATS_UPDATE_INTERVAL,
+					STATS_UPDATE_INTERVAL,
+					STATS_UPDATE_INTERVAL,
+					giftId,
+				]
 			);
 
 			const hourlyStats = new Map<string, number>();
 			purchaseHistory.forEach((record) => {
-				const hourStr = record.hour.padStart(2, "0") + ":00";
+				const hourEnd = new Date(record.timestamp).getHours() + 1;
+				const hour = (hourEnd % 24).toString().padStart(2, "0") + ":00";
 				hourlyStats.set(
-					hourStr,
-					(hourlyStats.get(hourStr) || 0) + record.change_amount
+					hour,
+					(hourlyStats.get(hour) || 0) + record.change_amount
 				);
 			});
 
@@ -261,27 +320,22 @@ export class GiftController {
 				}
 			});
 
-			const totalPurchases = purchaseHistory.reduce(
-				(sum, record) => sum + record.change_amount,
+			const totalPurchases = Array.from(hourlyStats.values()).reduce(
+				(sum, count) => sum + count,
 				0
 			);
 
-			const firstPurchase = new Date(purchaseHistory[0]?.timestamp);
-			const lastPurchase = new Date(
-				purchaseHistory[purchaseHistory.length - 1]?.timestamp
-			);
-			const hoursElapsed = Math.max(
-				1,
-				(lastPurchase.getTime() - firstPurchase.getTime()) / (1000 * 60 * 60)
-			);
+			const avgHourlyRate =
+				totalPurchases > 0 ? Math.ceil(totalPurchases / 24) : 0;
+			let predictedSoldOutDate = null;
 
-			const avgHourlyRate = Math.ceil(totalPurchases / hoursElapsed);
-
-			const hoursRemaining = Math.ceil(gift.remaining_count / avgHourlyRate);
-			const predictedSoldOutDate = new Date();
-			predictedSoldOutDate.setHours(
-				predictedSoldOutDate.getHours() + hoursRemaining
-			);
+			if (avgHourlyRate > 0) {
+				const hoursRemaining = Math.ceil(gift.remaining_count / avgHourlyRate);
+				predictedSoldOutDate = new Date();
+				predictedSoldOutDate.setHours(
+					predictedSoldOutDate.getHours() + hoursRemaining
+				);
+			}
 
 			const response = {
 				gift_id: giftId,
@@ -296,10 +350,11 @@ export class GiftController {
 					purchase_rate: avgHourlyRate,
 					prediction: {
 						remaining: gift.remaining_count,
-						predicted_sold_out: predictedSoldOutDate.toISOString(),
-						confidence: 0.8,
+						predicted_sold_out: predictedSoldOutDate
+							? predictedSoldOutDate.toISOString()
+							: null,
+						confidence: totalPurchases > 0 ? 0.8 : 0,
 						avg_hourly_rate: avgHourlyRate,
-						hours_elapsed: Math.round(hoursElapsed),
 						total_purchases_24h: totalPurchases,
 					},
 					hourly_stats: Array.from(hourlyStats.entries())
@@ -307,9 +362,11 @@ export class GiftController {
 							hour,
 							count: Math.round(count),
 						}))
+						.filter((stat) => stat.count > 0)
 						.sort((a, b) => a.hour.localeCompare(b.hour)),
 				},
 				last_updated: gift.last_updated,
+				interval_minutes: STATS_UPDATE_INTERVAL / 60000,
 			};
 
 			res.json(response);

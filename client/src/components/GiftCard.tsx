@@ -1,5 +1,4 @@
 // src/components/GiftCard.tsx
-import { FC } from "react";
 import { Gift } from "../types/gift";
 import { useGetGiftStickerQuery } from "../store/api/gifts";
 import { Star, Clock } from "lucide-react";
@@ -9,7 +8,7 @@ interface GiftCardProps {
 	onClick: (id: string) => void;
 }
 
-export const GiftCard: FC<GiftCardProps> = ({ gift, onClick }) => {
+export const GiftCard = ({ gift, onClick }: GiftCardProps) => {
 	const { data: sticker } = useGetGiftStickerQuery(gift.custom_emoji_id);
 
 	const percentComplete =
@@ -22,7 +21,6 @@ export const GiftCard: FC<GiftCardProps> = ({ gift, onClick }) => {
                  hover:border-gray-600/50 transition-all cursor-pointer"
 		>
 			<div className="flex items-start gap-6">
-				{/* Sticker/Emoji Section */}
 				<div className="relative w-32 h-32 flex-shrink-0">
 					{sticker ? (
 						<img
@@ -40,7 +38,6 @@ export const GiftCard: FC<GiftCardProps> = ({ gift, onClick }) => {
 					</div>
 				</div>
 
-				{/* Info Section */}
 				<div className="flex-grow">
 					<div className="flex items-center gap-2 mb-2">
 						<Star className="h-4 w-4 text-yellow-400" />
@@ -49,7 +46,6 @@ export const GiftCard: FC<GiftCardProps> = ({ gift, onClick }) => {
 						</span>
 					</div>
 
-					{/* Stats Grid */}
 					<div className="grid grid-cols-2 gap-4 mb-4">
 						<div>
 							<div className="text-sm text-gray-400">Remaining</div>
@@ -65,7 +61,6 @@ export const GiftCard: FC<GiftCardProps> = ({ gift, onClick }) => {
 						</div>
 					</div>
 
-					{/* Progress Bar */}
 					<div className="w-full bg-gray-700 rounded-full h-2 mb-4">
 						<div
 							className="bg-blue-500 rounded-full h-2 transition-all duration-300"
@@ -73,7 +68,6 @@ export const GiftCard: FC<GiftCardProps> = ({ gift, onClick }) => {
 						/>
 					</div>
 
-					{/* Footer Info */}
 					<div className="flex items-center gap-2 text-sm text-gray-400">
 						<Clock className="h-4 w-4" />
 						<span>Updated {new Date(gift.last_updated).toLocaleString()}</span>

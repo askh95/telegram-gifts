@@ -1,3 +1,5 @@
+// src/models/Gift.ts
+
 export interface TelegramGiftResponse {
 	id: string;
 	sticker: {

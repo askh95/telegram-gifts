@@ -9,7 +9,6 @@ export const GiftList: FC = () => {
 	const navigate = useNavigate();
 	const { data: gifts, isLoading, error, refetch } = useGetGiftsQuery();
 
-	// Автообновление списка каждые 3 секунды
 	useAutoRefresh(() => {
 		refetch();
 	});
@@ -43,7 +42,6 @@ export const GiftList: FC = () => {
 	return (
 		<div className="min-h-screen bg-gray-900 text-white p-6">
 			<div className="max-w-7xl mx-auto">
-				{/* Заголовок */}
 				<div className="flex justify-between items-center mb-8">
 					<h1 className="text-2xl font-bold">Доступные подарки</h1>
 					<div className="text-gray-400 text-sm flex items-center gap-2">
@@ -52,7 +50,6 @@ export const GiftList: FC = () => {
 					</div>
 				</div>
 
-				{/* Сетка карточек */}
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 					{gifts?.map((gift) => (
 						<GiftCard

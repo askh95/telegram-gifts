@@ -1,9 +1,8 @@
 import { useEffect } from "react";
-import { useDispatch } from "react-redux";
 
 export const useAutoRefresh = (
 	refreshFunction: () => void,
-	interval: number = 1000
+	interval: number = 10000
 ) => {
 	useEffect(() => {
 		const timer = setInterval(() => {

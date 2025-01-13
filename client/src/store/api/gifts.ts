@@ -22,8 +22,11 @@ export const giftsApi = createApi({
 		getGiftStats: builder.query<GiftStats, string>({
 			query: (id) => `/gifts/${id}/stats`,
 		}),
-		getGiftHistory: builder.query<GiftHistory[], string>({
-			query: (id) => `/gifts/${id}/history`,
+		getGiftHistory: builder.query<
+			GiftHistory[],
+			{ id: string; limit?: number }
+		>({
+			query: ({ id, limit = 15 }) => `/gifts/${id}/history?limit=${limit}`,
 			transformResponse: (response: { data: GiftHistory[] }) => response.data,
 		}),
 		getGiftSticker: builder.query<GiftSticker, string>({
