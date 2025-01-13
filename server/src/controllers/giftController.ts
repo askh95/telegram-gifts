@@ -1,4 +1,3 @@
-// src/controllers/giftController.ts
 import { Request, Response } from "express";
 import { Database } from "sqlite";
 import { fetchGifts } from "../services/telegramService";
@@ -10,6 +9,7 @@ interface ExistingGift {
 	telegram_id: string;
 	remaining_count: number;
 	total_count: number;
+	status: "active" | "sold_out";
 }
 
 interface PaginationQuery {
@@ -19,6 +19,11 @@ interface PaginationQuery {
 	endDate?: string;
 	minChange?: string;
 	maxChange?: string;
+	minStars?: string;
+	maxStars?: string;
+	minRemaining?: string;
+	maxRemaining?: string;
+	status?: string;
 }
 
 export class GiftController {
@@ -173,14 +178,48 @@ export class GiftController {
 			const limit = parseInt(req.query.limit || "20");
 			const offset = (page - 1) * limit;
 
+			let baseQuery = `SELECT * FROM gifts WHERE 1=1`;
+			const params: any[] = [];
+
+			if (req.query.status) {
+				baseQuery += ` AND status = ?`;
+				params.push(req.query.status);
+			}
+
+			if (req.query.minStars) {
+				baseQuery += ` AND star_count >= ?`;
+				params.push(parseInt(req.query.minStars));
+			}
+			if (req.query.maxStars) {
+				baseQuery += ` AND star_count <= ?`;
+				params.push(parseInt(req.query.maxStars));
+			}
+
+			if (req.query.minRemaining) {
+				baseQuery += ` AND remaining_count >= ?`;
+				params.push(parseInt(req.query.minRemaining));
+			}
+			if (req.query.maxRemaining) {
+				baseQuery += ` AND remaining_count <= ?`;
+				params.push(parseInt(req.query.maxRemaining));
+			}
+
+			const queryWithSort = `${baseQuery} 
+                ORDER BY 
+                    CASE 
+                        WHEN status = 'sold_out' THEN 2
+                        ELSE 1 
+                    END,
+                    remaining_count ASC`;
+
+			const finalQuery = `${queryWithSort} LIMIT ? OFFSET ?`;
+
 			const [gifts, total] = await Promise.all([
-				this.db.all<Gift[]>(
-					`SELECT * FROM gifts 
-           ORDER BY last_updated DESC
-           LIMIT ? OFFSET ?`,
-					[limit, offset]
+				this.db.all<Gift[]>(finalQuery, [...params, limit, offset]),
+				this.db.get<{ count: number }>(
+					`SELECT COUNT(*) as count FROM (${baseQuery})`,
+					params
 				),
-				this.db.get<{ count: number }>("SELECT COUNT(*) as count FROM gifts"),
 			]);
 
 			res.json({
@@ -273,7 +312,7 @@ export class GiftController {
                         slot_duration
                     FROM time_slots
                     WHERE datetime(slot_start) < datetime('now')
-                    LIMIT 288  -- 24 hours * 12 intervals per hour (5 min intervals)
+                    LIMIT 288
                 )
                 SELECT 
                     time_slots.slot_start as timestamp,
@@ -320,16 +359,22 @@ export class GiftController {
 				}
 			});
 
-			const totalPurchases = Array.from(hourlyStats.values()).reduce(
-				(sum, count) => sum + count,
+			const hourlyStatsArray = Array.from(hourlyStats.entries())
+				.map(([hour, count]) => ({
+					hour,
+					count: Math.round(count),
+				}))
+				.filter((stat) => stat.count > 0)
+				.sort((a, b) => a.hour.localeCompare(b.hour));
+
+			const totalPurchases = hourlyStatsArray.reduce(
+				(sum, stat) => sum + stat.count,
 				0
 			);
+			const avgHourlyRate = Math.ceil(totalPurchases / hourlyStatsArray.length);
 
-			const avgHourlyRate =
-				totalPurchases > 0 ? Math.ceil(totalPurchases / 24) : 0;
 			let predictedSoldOutDate = null;
-
-			if (avgHourlyRate > 0) {
+			if (avgHourlyRate > 0 && gift.remaining_count > 0) {
 				const hoursRemaining = Math.ceil(gift.remaining_count / avgHourlyRate);
 				predictedSoldOutDate = new Date();
 				predictedSoldOutDate.setHours(
@@ -350,20 +395,12 @@ export class GiftController {
 					purchase_rate: avgHourlyRate,
 					prediction: {
 						remaining: gift.remaining_count,
-						predicted_sold_out: predictedSoldOutDate
-							? predictedSoldOutDate.toISOString()
-							: null,
+						predicted_sold_out: predictedSoldOutDate?.toISOString() || null,
 						confidence: totalPurchases > 0 ? 0.8 : 0,
 						avg_hourly_rate: avgHourlyRate,
 						total_purchases_24h: totalPurchases,
 					},
-					hourly_stats: Array.from(hourlyStats.entries())
-						.map(([hour, count]) => ({
-							hour,
-							count: Math.round(count),
-						}))
-						.filter((stat) => stat.count > 0)
-						.sort((a, b) => a.hour.localeCompare(b.hour)),
+					hourly_stats: hourlyStatsArray,
 				},
 				last_updated: gift.last_updated,
 				interval_minutes: STATS_UPDATE_INTERVAL / 60000,

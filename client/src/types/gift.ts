@@ -1,4 +1,3 @@
-// src/types/gift.ts
 export interface Gift {
 	telegram_id: string;
 	custom_emoji_id: string;
@@ -68,3 +67,33 @@ export interface GiftSticker {
 	thumbnail_file_id: string;
 	thumb_file_id: string;
 }
+
+export interface GiftsQueryParams {
+	minStars?: number;
+	maxStars?: number;
+	minRemaining?: number;
+	maxRemaining?: number;
+	limit?: number;
+	page?: number;
+	status?: "active" | "sold_out";
+}
+
+export interface PaginatedResponse<T> {
+	data: T[];
+	pagination: {
+		total: number;
+		page: number;
+		limit: number;
+		totalPages: number;
+	};
+}
+
+export interface CryptoAddress {
+	name: string;
+	address?: string;
+	shortAddress?: string;
+	color: string;
+	special?: boolean;
+}
+
+export type CopySuccessMessage = string;

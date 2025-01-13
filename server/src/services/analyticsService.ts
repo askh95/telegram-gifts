@@ -1,4 +1,3 @@
-// src/services/analyticsService.ts
 import { Database } from "sqlite";
 import * as tf from "@tensorflow/tfjs-node";
 import moment from "moment";
@@ -465,24 +464,6 @@ export class AnalyticsService {
 		);
 
 		return timeSpan > 0 ? totalChanges / timeSpan : 0;
-	}
-
-	private calculateConfidence(predictions: any[]): number {
-		const actualValues = predictions.map((p) => p.predictedCount);
-		const meanActual =
-			actualValues.reduce((a, b) => a + b) / actualValues.length;
-
-		const totalSS = actualValues.reduce(
-			(sum, val) => sum + Math.pow(val - meanActual, 2),
-			0
-		);
-
-		const residualSS = actualValues
-			.slice(1)
-			.reduce((sum, val, i) => sum + Math.pow(val - actualValues[i], 2), 0);
-
-		const rSquared = 1 - residualSS / totalSS;
-		return Math.max(0, Math.min(1, rSquared));
 	}
 
 	private normalizeData(

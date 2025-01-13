@@ -1,5 +1,3 @@
-// src/models/Gift.ts
-
 export interface TelegramGiftResponse {
 	id: string;
 	sticker: {
@@ -29,7 +27,7 @@ export interface TelegramGiftResponse {
 		};
 	};
 	star_count: number;
-	remaining_count?: number;
+	remaining_count: number;
 	total_count?: number;
 }
 

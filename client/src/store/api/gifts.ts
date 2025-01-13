@@ -1,20 +1,30 @@
-// src/store/api/gifts.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type {
 	Gift,
 	GiftDetails,
 	GiftStats,
 	GiftHistory,
-	GiftSticker,
+	GiftsQueryParams,
+	PaginatedResponse,
 } from "../../types/gift";
 
 export const giftsApi = createApi({
 	reducerPath: "giftsApi",
-	baseQuery: fetchBaseQuery({ baseUrl: "http://localhost:3000/api" }),
+	baseQuery: fetchBaseQuery({ baseUrl: import.meta.env.VITE_BASE_URL }),
 	endpoints: (builder) => ({
-		getGifts: builder.query<Gift[], void>({
-			query: () => "/gifts",
-			transformResponse: (response: { data: Gift[] }) => response.data,
+		getGifts: builder.query<PaginatedResponse<Gift>, GiftsQueryParams | void>({
+			query: (params) => ({
+				url: "/gifts",
+				params: {
+					minStars: params?.minStars,
+					maxStars: params?.maxStars,
+					minRemaining: params?.minRemaining,
+					maxRemaining: params?.maxRemaining,
+					status: params?.status,
+					page: params?.page || 1,
+					limit: 100,
+				},
+			}),
 		}),
 		getGiftById: builder.query<GiftDetails, string>({
 			query: (id) => `/gifts/${id}`,
@@ -29,9 +39,6 @@ export const giftsApi = createApi({
 			query: ({ id, limit = 15 }) => `/gifts/${id}/history?limit=${limit}`,
 			transformResponse: (response: { data: GiftHistory[] }) => response.data,
 		}),
-		getGiftSticker: builder.query<GiftSticker, string>({
-			query: (id) => `/gifts/${id}/sticker`,
-		}),
 	}),
 });
 
@@ -40,5 +47,4 @@ export const {
 	useGetGiftByIdQuery,
 	useGetGiftStatsQuery,
 	useGetGiftHistoryQuery,
-	useGetGiftStickerQuery,
 } = giftsApi;

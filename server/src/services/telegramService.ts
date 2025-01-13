@@ -1,4 +1,3 @@
-// src/services/telegramService.ts
 import axios from "axios";
 import { TELEGRAM_BOT_TOKEN } from "../utils/constants";
 import { TelegramGiftResponse } from "../models/Gift";

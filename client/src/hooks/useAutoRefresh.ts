@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 export const useAutoRefresh = (
 	refreshFunction: () => void,
-	interval: number = 10000
+	interval: number = 30000
 ) => {
 	useEffect(() => {
 		const timer = setInterval(() => {

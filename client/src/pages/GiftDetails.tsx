@@ -1,4 +1,4 @@
-import { FC, useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
 	Calculator,
@@ -22,10 +22,10 @@ interface AnimatedValueProps {
 	formatter?: (value: number) => string;
 }
 
-const AnimatedValue: FC<AnimatedValueProps> = ({
+const AnimatedValue = ({
 	value,
 	formatter = (val) => val.toLocaleString(),
-}) => {
+}: AnimatedValueProps) => {
 	const [textColor, setTextColor] = useState("text-white");
 	const prevValueRef = useRef(value);
 
@@ -53,24 +53,7 @@ const AnimatedValue: FC<AnimatedValueProps> = ({
 	);
 };
 
-const formatUTC3Date = (date: string | number | Date) => {
-	const utc3Date = new Date(date);
-	utc3Date.setHours(utc3Date.getHours() + 3);
-
-	return (
-		new Intl.DateTimeFormat("ru-RU", {
-			year: "numeric",
-			month: "2-digit",
-			day: "2-digit",
-			hour: "2-digit",
-			minute: "2-digit",
-			hour12: false,
-			timeZone: "UTC",
-		}).format(utc3Date) + " (UTC+3)"
-	);
-};
-
-export const GiftDetails: FC = () => {
+export const GiftDetails = () => {
 	const { id = "" } = useParams();
 	const navigate = useNavigate();
 
@@ -80,12 +63,13 @@ export const GiftDetails: FC = () => {
 		id,
 		limit: 15,
 	});
-	// const { data: sticker } = useGetGiftStickerQuery(gift?.telegram_id ?? "");
 
 	useAutoRefresh(() => {
-		refetchStats();
-		refetchHistory();
-		refetchGift();
+		if (stats?.status !== "sold_out") {
+			refetchStats();
+			refetchHistory();
+			refetchGift();
+		}
 	});
 
 	if (!gift || !stats || !history) {
@@ -101,41 +85,31 @@ export const GiftDetails: FC = () => {
 	return (
 		<div className="min-h-screen bg-gray-900 text-white p-6">
 			<div className="max-w-7xl mx-auto space-y-6">
-				{/* Header */}
 				<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 					<div className="flex items-center gap-4">
 						<button
-							onClick={() => navigate("/")}
+							onClick={() => navigate(-1)}
 							className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 
                       backdrop-blur-sm rounded-lg border border-gray-700/50 hover:border-gray-600/50 
                       transition-all text-gray-300 hover:text-white"
 						>
 							<ArrowLeft className="h-4 w-4" />
-							Назад к списку
+							Назад
 						</button>
-						<h1 className="text-2xl font-bold">Детали подарка</h1>
 					</div>
 					<div className="text-gray-400 text-sm flex items-center gap-2">
 						<RefreshCcw className="h-4 w-4" />
-						Последнее обновление: {formatUTC3Date(gift.last_updated)}
+						Обновлено: {gift.last_updated} <u>UTC +0</u>
 					</div>
 				</div>
 
 				<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50">
 					<div className="flex flex-col sm:flex-row items-center gap-6">
 						<div className="relative w-32 h-32 flex-shrink-0">
-							{/* {sticker ? (
-								<TGSticker
-									fileUrl={sticker.file_url}
-									size={128}
-									className="w-full h-full object-cover rounded-lg"
-								/>
-							) : ( */}
 							<div className="w-full h-full flex items-center justify-center bg-gray-700/50 rounded-lg">
-								<span className="text-4xl">{gift.emoji}</span>
+								<span className="text-7xl">{gift.emoji}</span>
 							</div>
-							{/* )} */}
-							<div className="absolute top-2 right-2 bg-blue-500/80 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-full">
+							<div className="absolute top-2 right-2 bg-blue-500/80 backdrop-blur-sm text-white text-sm font-bold px-3 py-1 rounded-full">
 								{gift.star_count} ⭐
 							</div>
 						</div>
@@ -148,10 +122,6 @@ export const GiftDetails: FC = () => {
 								<p className="text-gray-400 text-sm flex items-center justify-center sm:justify-start gap-2">
 									<span className="w-2 h-2 rounded-full bg-emerald-400"></span>
 									ID: {gift.telegram_id}
-								</p>
-								<p className="text-gray-400 text-sm flex items-center justify-center sm:justify-start gap-2">
-									<span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-									Размер: {gift.file_size} байт
 								</p>
 							</div>
 						</div>
@@ -203,10 +173,12 @@ export const GiftDetails: FC = () => {
 							<Calculator className="h-4 w-4 text-blue-400" />
 						</div>
 						<AnimatedValue value={stats.current_count} />
-						<p className="text-xs text-gray-400">
-							Ожидаемое завершение:{" "}
-							{formatUTC3Date(stats.analytics.prediction.predicted_sold_out)}
-						</p>
+						{stats.status !== "sold_out" && (
+							<p className="text-xs text-gray-400">
+								Ожидаемое завершение:{" "}
+								{stats.analytics.prediction.predicted_sold_out}
+							</p>
+						)}
 					</div>
 				</div>
 

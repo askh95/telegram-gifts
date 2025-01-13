@@ -4,21 +4,6 @@ import type { GiftHistory as GiftHistoryType } from "../types/gift";
 interface GiftHistoryProps {
 	history: GiftHistoryType[];
 }
-const formatUTC3Date = (date: string | number | Date) => {
-	const utc3Date = new Date(date);
-	utc3Date.setHours(utc3Date.getHours() + 6); // ну там +3 должно быть, я хз, почему +6, ну крч это мск
-
-	return new Intl.DateTimeFormat("ru-RU", {
-		year: "numeric",
-		month: "2-digit",
-		day: "2-digit",
-		hour: "2-digit",
-		minute: "2-digit",
-		second: "2-digit",
-		hour12: false,
-		timeZone: "UTC",
-	}).format(utc3Date);
-};
 
 export const GiftHistory = ({ history }: GiftHistoryProps) => {
 	return (
@@ -53,8 +38,8 @@ export const GiftHistory = ({ history }: GiftHistoryProps) => {
 						</style>
 
 						<div className="flex items-center justify-between">
-							<span className="text-gray-300 text-sm">
-								{formatUTC3Date(item.last_updated)}
+							<span className="text-gray-300 text-sm sm:text-xs">
+								{item.last_updated} <u>UTC +0</u>
 							</span>
 							<span className="text-sm font-medium">{item.emoji}</span>
 						</div>

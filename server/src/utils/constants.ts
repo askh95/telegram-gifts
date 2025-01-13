@@ -1,4 +1,3 @@
-// src/utils/constants.ts
 import dotenv from "dotenv";
 dotenv.config();
 

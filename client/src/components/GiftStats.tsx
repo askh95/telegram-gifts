@@ -17,7 +17,16 @@ interface GiftStatsProps {
 	hourlyStats: HourlyStat[];
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface TooltipProps {
+	active?: boolean;
+	payload?: Array<{
+		name: string;
+		value: number;
+	}>;
+	label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
 	if (active && payload && payload.length) {
 		return (
 			<div className="bg-gray-800 p-3 rounded-lg border border-gray-700 shadow-lg">
@@ -34,30 +43,53 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export const GiftStats = ({ hourlyStats }: GiftStatsProps) => {
 	const formattedData = hourlyStats.map((stat) => {
 		const hour = parseInt(stat.hour);
-		const utc3Hour = (hour + 3) % 24;
+
 		return {
-			hour: `${utc3Hour.toString().padStart(2, "0")}:00`,
+			hour: `${hour.toString().padStart(2, "0")}:00`,
 			purchases: stat.count,
 		};
 	});
 
 	return (
-		<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50">
-			<h3 className="text-xl font-bold text-white mb-4">
-				Почасовые покупки (UTC+3)
+		<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-4 sm:p-6 shadow-lg border border-gray-700/50">
+			<h3 className="text-lg sm:text-xs font-bold text-white mb-2 sm:mb-4">
+				Почасовые покупки <u>UTC +0</u>
 			</h3>
-			<div className="h-[300px]">
+			<div className="h-[200px] sm:h-[250px] md:h-[300px]">
 				<ResponsiveContainer width="100%" height="100%">
-					<AreaChart data={formattedData}>
+					<AreaChart
+						data={formattedData}
+						margin={{
+							top: 5,
+							right: 10,
+							left: -10,
+							bottom: 5,
+						}}
+					>
 						<defs>
 							<linearGradient id="colorPurchases" x1="0" y1="0" x2="0" y2="1">
 								<stop offset="5%" stopColor="#34d399" stopOpacity={0.8} />
 								<stop offset="95%" stopColor="#34d399" stopOpacity={0.1} />
 							</linearGradient>
 						</defs>
-						<CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-						<XAxis dataKey="hour" stroke="#888888" fontSize={12} />
-						<YAxis stroke="#888888" fontSize={12} />
+						<CartesianGrid
+							strokeDasharray="3 3"
+							stroke="#374151"
+							vertical={false}
+						/>
+						<XAxis
+							dataKey="hour"
+							stroke="#888888"
+							fontSize={10}
+							axisLine={false}
+							tickLine={false}
+						/>
+						<YAxis
+							stroke="#888888"
+							fontSize={10}
+							axisLine={false}
+							tickLine={false}
+						/>
 						<Tooltip content={<CustomTooltip />} />
 						<Area
 							type="monotone"
