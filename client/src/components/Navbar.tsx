@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Menu, X, Gift, BarChart } from "lucide-react";
+import { Menu, X, Gift } from "lucide-react";
 import logo from "../assets/logo.svg";
 
 export const Navbar = () => {
@@ -36,16 +36,6 @@ export const Navbar = () => {
 							<Gift className="h-5 w-5" />
 							Подарки
 						</NavLink>
-						<NavLink
-							to="/analytics"
-							className="text-gray-300 transition-all duration-300 text-xl font-medium hover:scale-110 hover:text-blue-500 flex items-center gap-2"
-							style={({ isActive }) => ({
-								color: isActive ? "#3B82F6" : "",
-							})}
-						>
-							<BarChart className="h-5 w-5" />
-							Аналитика
-						</NavLink>
 					</div>
 
 					<div className="md:hidden">
@@ -75,17 +65,6 @@ export const Navbar = () => {
 							>
 								<Gift className="h-5 w-5" />
 								Подарки
-							</NavLink>
-							<NavLink
-								to="/analytics"
-								className="text-gray-300 flex items-center gap-2  py-2 text-base font-medium hover:bg-gray-700 hover:text-blue-500"
-								style={({ isActive }) => ({
-									color: isActive ? "#3B82F6" : "",
-								})}
-								onClick={toggleMobileMenu}
-							>
-								<BarChart className="h-5 w-5" />
-								Аналитика
 							</NavLink>
 						</div>
 					</div>
