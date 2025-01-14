@@ -16,12 +16,12 @@ export const giftsApi = createApi({
 			query: (params) => ({
 				url: "/gifts",
 				params: {
-					minStars: params?.minStars,
-					maxStars: params?.maxStars,
-					minRemaining: params?.minRemaining,
-					maxRemaining: params?.maxRemaining,
-					status: params?.status,
-					page: params?.page || 1,
+					minStars: params?.minStars ?? undefined,
+					maxStars: params?.maxStars ?? undefined,
+					minRemaining: params?.minRemaining ?? undefined,
+					maxRemaining: params?.maxRemaining ?? undefined,
+					status: params?.status ?? undefined,
+					page: params?.page ?? 1,
 					limit: 100,
 				},
 			}),

@@ -3,6 +3,7 @@ import { Pool } from "pg";
 import { fetchGifts } from "../services/telegramService";
 import { Gift, TelegramGiftResponse } from "../models/Gift";
 import { AnalyticsService } from "../services/analyticsService";
+import moment from "moment";
 
 interface HistoryRecord {
 	remaining_count: number;
@@ -300,17 +301,24 @@ export class GiftController {
 		try {
 			const giftId = req.params.id;
 
-			const {
-				rows: [gift],
-			} = await this.pool.query<GiftWithFormattedDate>(
-				`
-                SELECT 
-                    *,
-                    to_char(last_updated AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00"') as formatted_last_updated
-                FROM gifts 
-                WHERE telegram_id = $1`,
-				[giftId]
-			);
+			const [
+				{
+					rows: [gift],
+				},
+				prediction,
+			] = await Promise.all([
+				this.pool.query<GiftWithFormattedDate>(
+					`
+              SELECT 
+                *,
+                to_char(last_updated AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00"') as formatted_last_updated
+              FROM gifts 
+              WHERE telegram_id = $1
+            `,
+					[giftId]
+				),
+				this.analyticsService.getLatestPrediction(giftId),
+			]);
 
 			if (!gift) {
 				return res.status(404).json({ error: "Gift not found" });
@@ -318,54 +326,50 @@ export class GiftController {
 
 			const { rows: hourlyStats } = await this.pool.query(
 				`
-                WITH time_slots AS (
-                    SELECT 
-                        generate_series(
-                            date_trunc('hour', NOW() AT TIME ZONE 'UTC' - interval '24 hours'),
-                            date_trunc('hour', NOW() AT TIME ZONE 'UTC'),
-                            interval '1 hour'
-                        ) AS hour
-                ),
-                hourly_purchases AS (
-                    SELECT 
-                        date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC') as hour,
-                        COALESCE(SUM(gh.change_amount), 0)::INTEGER as purchase_count
-                    FROM gifts_history gh
-                    WHERE 
-                        gh.telegram_id = $1 
-                        AND gh.last_updated >= NOW() AT TIME ZONE 'UTC' - interval '24 hours'
-                    GROUP BY date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC')
-                )
-                SELECT 
-                    to_char(ts.hour AT TIME ZONE 'UTC', 'HH24:00') as hour,
-                    COALESCE(hp.purchase_count, 0) as count
-                FROM time_slots ts
-                LEFT JOIN hourly_purchases hp ON ts.hour = hp.hour
-                ORDER BY ts.hour`,
+            WITH time_slots AS (
+              SELECT 
+                generate_series(
+                  date_trunc('hour', NOW() AT TIME ZONE 'UTC' - interval '24 hours'),
+                  date_trunc('hour', NOW() AT TIME ZONE 'UTC'),
+                  interval '1 hour'
+                ) AS hour
+            ),
+            hourly_purchases AS (
+              SELECT 
+                date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC') as hour,
+                COALESCE(SUM(gh.change_amount), 0)::INTEGER as purchase_count
+              FROM gifts_history gh
+              WHERE 
+                gh.telegram_id = $1 
+                AND gh.last_updated >= NOW() AT TIME ZONE 'UTC' - interval '24 hours'
+              GROUP BY date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC')
+            )
+            SELECT 
+              to_char(ts.hour AT TIME ZONE 'UTC', 'HH24:00') as hour,
+              COALESCE(hp.purchase_count, 0) as count
+            FROM time_slots ts
+            LEFT JOIN hourly_purchases hp ON ts.hour = hp.hour
+            ORDER BY ts.hour
+          `,
 				[giftId]
 			);
 
-			// Get current hour purchases
 			const {
-				rows: [currentHourStats],
+				rows: [purchaseStats],
 			} = await this.pool.query(
 				`
-                SELECT 
-                    COALESCE(SUM(change_amount), 0)::INTEGER as count
-                FROM gifts_history
-                WHERE 
-                    telegram_id = $1
-                    AND last_updated >= date_trunc('hour', NOW() AT TIME ZONE 'UTC')
-                    AND last_updated < NOW() AT TIME ZONE 'UTC'`,
+            SELECT 
+              MIN(last_updated) as first_update,
+              COALESCE(SUM(CASE 
+                WHEN last_updated >= NOW() - interval '24 hours' 
+                THEN change_amount 
+                ELSE 0 
+              END), 0)::INTEGER as purchases_24h
+            FROM gifts_history
+            WHERE telegram_id = $1 AND change_amount > 0
+          `,
 				[giftId]
 			);
-
-			const minutesInCurrentHour = new Date().getUTCMinutes();
-			const currentHourPurchases = currentHourStats.count;
-			const currentRate =
-				minutesInCurrentHour > 0
-					? Math.round((currentHourPurchases / minutesInCurrentHour) * 60)
-					: currentHourPurchases;
 
 			let peakHourData = { hour: "00:00", count: 0 };
 			for (const stat of hourlyStats) {
@@ -379,7 +383,13 @@ export class GiftController {
 				0
 			);
 
-			const prediction = await this.analyticsService.updatePrediction(giftId);
+			const hoursToCount = Math.min(
+				24,
+				Math.max(1, moment().diff(moment(purchaseStats.first_update), "hours"))
+			);
+			const currentRate = Math.round(
+				purchaseStats.purchases_24h / hoursToCount
+			);
 
 			const hourlyStatsFiltered = hourlyStats
 				.filter((stat) => stat.count > 0)
@@ -414,6 +424,13 @@ export class GiftController {
 			};
 
 			res.json(response);
+
+			if (
+				!prediction?.created_at ||
+				moment(prediction.created_at).isBefore(moment().subtract(30, "minutes"))
+			) {
+				this.analyticsService.updatePrediction(giftId).catch(console.error);
+			}
 		} catch (error) {
 			console.error("Error getting gift stats:", error);
 			res.status(500).json({

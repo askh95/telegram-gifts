@@ -122,15 +122,17 @@ export class AnalyticsService {
 		giftId: string
 	): Promise<PredictionResult | null> {
 		const { rows } = await this.pool.query<PredictionResult>(
-			`SELECT 
-                predicted_sold_out_date,
-                confidence,
-                prediction_data,
-                created_at
-            FROM gift_predictions
-            WHERE gift_id = $1
-            ORDER BY created_at DESC
-            LIMIT 1`,
+			`
+          SELECT 
+            predicted_sold_out_date,
+            confidence,
+            prediction_data,
+            created_at
+          FROM gift_predictions
+          WHERE gift_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        `,
 			[giftId]
 		);
 
