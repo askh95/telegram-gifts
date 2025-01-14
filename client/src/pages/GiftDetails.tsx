@@ -2,7 +2,6 @@ import { useRef, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
 	Calculator,
-	TrendingDown,
 	Clock,
 	Activity,
 	RefreshCcw,
@@ -101,9 +100,7 @@ export const GiftDetails = () => {
 	const formatPeakHour = (hour: string) => {
 		try {
 			const hourNum = parseInt(hour);
-			// Добавляем смещение часового пояса
 			const localHour = (hourNum + offset) % 24;
-			// Обрабатываем отрицательные часы при переходе через полночь
 			const adjustedHour = localHour < 0 ? localHour + 24 : localHour;
 			return `${adjustedHour.toString().padStart(2, "0")}:00`;
 		} catch (error) {
@@ -186,17 +183,6 @@ export const GiftDetails = () => {
 						<p className="text-xs text-gray-400">
 							{((purchased / stats.total_count) * 100).toFixed(1)}% от общего
 						</p>
-					</div>
-
-					<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50">
-						<div className="flex items-center justify-between mb-2">
-							<h3 className="text-sm font-medium text-gray-200">
-								Скорость покупок
-							</h3>
-							<TrendingDown className="h-4 w-4 text-red-400" />
-						</div>
-						<AnimatedValue value={Math.round(stats.analytics.purchase_rate)} />
-						<p className="text-xs text-gray-400">В час</p>
 					</div>
 
 					<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50">
