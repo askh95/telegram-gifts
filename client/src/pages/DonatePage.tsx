@@ -14,7 +14,7 @@ const DonatePage = () => {
 			color: "#0098c8",
 		},
 		{
-			name: "Telegram Подарите звездочки =( ",
+			name: "Telegram Channel",
 			special: true,
 			color: "#0098c8",
 		},
@@ -48,7 +48,10 @@ const DonatePage = () => {
 						<span className="text-white">Поддержать проект</span>
 					</h1>
 					<p className="mx-auto max-w-2xl text-gray-400">
-						Если вам нравится мой проект, вы можете поддержать его развитие
+						Если вам нравится мой проект, вы можете поддержать его развитие.{" "}
+						<br /> Кстати, данный веб-сайт размещён на бесплатном хостинге, и
+						мне бы очень помогла ваша поддержка для его переноса на полноценный
+						сервер.
 					</p>
 					<p className="mt-2 text-sm text-gray-500">
 						Нажмите на карточку чтобы скопировать адрес
@@ -95,7 +98,7 @@ const DonatePage = () => {
 							</div>
 							{crypto.special ? (
 								<a
-									href="https://t.me/askh95"
+									href="https://t.me/giftsanalyz"
 									target="_blank"
 									rel="noopener noreferrer"
 									className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-[#0098c8] px-6 py-3 text-base text-white transition-all hover:bg-[#0098c8]/80 group"
