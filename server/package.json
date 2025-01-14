@@ -1,13 +1,15 @@
 {
 	"name": "server",
 	"version": "1.0.0",
-	"main": "index.js",
+	"main": "dist/index.js",
 	"scripts": {
 		"test": "echo \"Error: no test specified\" && exit 1",
 		"start": "node dist/index.js",
 		"dev": "nodemon src/index.ts",
 		"build": "tsc",
-		"watch": "tsc -w"
+		"watch": "tsc -w",
+		"postinstall": "npm run build",
+		"render-postbuild": "npm run build"
 	},
 	"keywords": [],
 	"author": "",
@@ -24,14 +26,14 @@
 		"pg": "^8.13.1",
 		"pg-promise": "^11.10.2",
 		"sqlite": "^5.1.1",
-		"sqlite3": "^5.1.7"
-	},
-	"devDependencies": {
+		"sqlite3": "^5.1.7",
+		"typescript": "^5.7.3",
 		"@types/express": "^5.0.0",
 		"@types/node": "^22.10.5",
-		"@types/pg": "^8.11.10",
+		"@types/pg": "^8.11.10"
+	},
+	"devDependencies": {
 		"nodemon": "^3.1.9",
-		"ts-node": "^10.9.2",
-		"typescript": "^5.7.3"
+		"ts-node": "^10.9.2"
 	}
 }
