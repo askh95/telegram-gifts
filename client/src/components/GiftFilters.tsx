@@ -66,9 +66,9 @@ export const GiftFilters = ({
 	const getQuantityButtonText = () => {
 		switch (currentSort) {
 			case "lowest_remaining":
-				return "Наименьший остаток";
+				return "По возрастанию";
 			case "highest_remaining":
-				return "Наибольший остаток";
+				return "По убыванию";
 			default:
 				return "По количеству";
 		}
@@ -77,11 +77,11 @@ export const GiftFilters = ({
 	const getStarsButtonText = () => {
 		switch (currentSort) {
 			case "lowest_stars":
-				return "Меньше звезд";
+				return "По возрастанию";
 			case "highest_stars":
-				return "Больше звезд";
+				return "По убыванию";
 			default:
-				return "По звездам";
+				return "По цене";
 		}
 	};
 
@@ -182,7 +182,7 @@ export const GiftFilters = ({
 									currentSort === "lowest_remaining" ? "bg-blue-500/20" : ""
 								}`}
 							>
-								Наименьший остаток
+								По возрастанию
 							</button>
 							<button
 								onClick={() => handleSortChange("highest_remaining")}
@@ -190,7 +190,7 @@ export const GiftFilters = ({
 									currentSort === "highest_remaining" ? "bg-blue-500/20" : ""
 								}`}
 							>
-								Наибольший остаток
+								По убыванию
 							</button>
 						</div>
 					)}
@@ -220,7 +220,7 @@ export const GiftFilters = ({
 									currentSort === "lowest_stars" ? "bg-blue-500/20" : ""
 								}`}
 							>
-								Меньше звезд
+								По возрастанию
 							</button>
 							<button
 								onClick={() => handleSortChange("highest_stars")}
@@ -228,7 +228,7 @@ export const GiftFilters = ({
 									currentSort === "highest_stars" ? "bg-blue-500/20" : ""
 								}`}
 							>
-								Больше звезд
+								По убыванию
 							</button>
 						</div>
 					)}

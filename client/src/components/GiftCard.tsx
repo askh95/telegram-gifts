@@ -17,8 +17,8 @@ export const GiftCard = ({ gift, onClick }: GiftCardProps) => {
 	const isSoldOut = gift.status === "sold_out";
 
 	const formatLastUpdated = (timestamp: string) => {
-		const date = dayjs(timestamp);
-		const localDate = date.add(offset, "hour");
+		const date = dayjs.utc(timestamp);
+		const localDate = date.local();
 		const sign = offset >= 0 ? "+" : "";
 		return `${localDate.format("DD.MM.YYYY HH:mm")} (UTC ${sign}${offset})`;
 	};
