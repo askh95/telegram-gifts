@@ -11,17 +11,17 @@ async function startServer() {
 	app.use(cors());
 	app.use(express.json());
 
-	const db = await initializeDatabase();
-	console.log("Database initialized successfully");
-	const giftController = new GiftController(db);
+	const pool = await initializeDatabase();
+	const giftController = new GiftController(pool);
 
 	let previousGiftCounts = new Map<string, number>();
 
 	async function updateGifts() {
 		try {
-			const beforeUpdate = await db.all(
+			const { rows: beforeUpdate } = await pool.query(
 				"SELECT telegram_id, remaining_count FROM gifts"
 			);
+
 			beforeUpdate.forEach((gift) => {
 				previousGiftCounts.set(gift.telegram_id, gift.remaining_count);
 			});
@@ -36,7 +36,13 @@ async function startServer() {
 
 	await updateGifts();
 
-	setInterval(updateGifts, UPDATE_INTERVAL);
+	const updateInterval = setInterval(updateGifts, UPDATE_INTERVAL);
+
+	process.on("SIGTERM", async () => {
+		clearInterval(updateInterval);
+		await pool.end();
+		process.exit(0);
+	});
 
 	app.listen(PORT, () => {
 		console.log(`Server running on port ${PORT}`);

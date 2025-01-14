@@ -3,7 +3,6 @@ import { useGetGiftsQuery } from "../store/api/gifts";
 import { GiftCard } from "../components/GiftCard";
 import { GiftFilters } from "../components/GiftFilters";
 import { RefreshCcw } from "lucide-react";
-import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import { Gift } from "../types/gift";
 
 type SortOption =
@@ -30,10 +29,6 @@ export const GiftList = () => {
 	} = useGetGiftsQuery({
 		limit: 20,
 		status: currentStatus === "all" ? undefined : currentStatus,
-	});
-
-	useAutoRefresh(() => {
-		refetch();
 	});
 
 	const handleGiftClick = (id: string) => {

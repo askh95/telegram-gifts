@@ -3,9 +3,10 @@ import type { GiftHistory as GiftHistoryType } from "../types/gift";
 
 interface GiftHistoryProps {
 	history: GiftHistoryType[];
+	formatDateTime: (date: string) => string;
 }
 
-export const GiftHistory = ({ history }: GiftHistoryProps) => {
+export const GiftHistory = ({ history, formatDateTime }: GiftHistoryProps) => {
 	return (
 		<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50">
 			<div className="flex items-center gap-2 mb-4">
@@ -39,7 +40,7 @@ export const GiftHistory = ({ history }: GiftHistoryProps) => {
 
 						<div className="flex items-center justify-between">
 							<span className="text-gray-300 text-xs sm:text-sm">
-								{item.last_updated} <u>UTC +0</u>
+								{formatDateTime(item.last_updated)}
 							</span>
 							<span className="text-sm font-medium">{item.emoji}</span>
 						</div>

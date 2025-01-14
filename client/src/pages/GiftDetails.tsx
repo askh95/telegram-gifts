@@ -14,6 +14,14 @@ import {
 	useGetGiftHistoryQuery,
 } from "../store/api/gifts";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
+import dayjs from "dayjs";
+import "dayjs/locale/ru";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
+import { useUserTimezone } from "../hooks/useUserTimezone";
+
 import { GiftHistory } from "../components/GiftHistory";
 import { GiftStats } from "../components/GiftStats";
 
@@ -21,6 +29,10 @@ interface AnimatedValueProps {
 	value: number;
 	formatter?: (value: number) => string;
 }
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(customParseFormat);
 
 const AnimatedValue = ({
 	value,
@@ -54,15 +66,51 @@ const AnimatedValue = ({
 };
 
 export const GiftDetails = () => {
+	const { offset } = useUserTimezone();
+
 	const { id = "" } = useParams();
 	const navigate = useNavigate();
 
 	const { data: gift, refetch: refetchGift } = useGetGiftByIdQuery(id);
 	const { data: stats, refetch: refetchStats } = useGetGiftStatsQuery(id);
+
 	const { data: history, refetch: refetchHistory } = useGetGiftHistoryQuery({
 		id,
 		limit: 15,
 	});
+
+	const formatDateTime = (isoString: string) => {
+		try {
+			const cleanDateTime = isoString.split(".")[0];
+			const date = dayjs(cleanDateTime);
+
+			if (!date.isValid()) {
+				console.error("Invalid date:", isoString);
+				return "Неверная дата";
+			}
+
+			const localDate = date.add(offset, "hour");
+			const sign = offset >= 0 ? "+" : "";
+			return `${localDate.format("DD.MM.YYYY HH:mm")} (UTC ${sign}${offset})`;
+		} catch (error) {
+			console.error("Date parsing error:", error, "for date:", isoString);
+			return "Ошибка формата даты";
+		}
+	};
+
+	const formatPeakHour = (hour: string) => {
+		try {
+			const hourNum = parseInt(hour);
+			// Добавляем смещение часового пояса
+			const localHour = (hourNum + offset) % 24;
+			// Обрабатываем отрицательные часы при переходе через полночь
+			const adjustedHour = localHour < 0 ? localHour + 24 : localHour;
+			return `${adjustedHour.toString().padStart(2, "0")}:00`;
+		} catch (error) {
+			console.error("Hour parsing error:", error);
+			return "00:00";
+		}
+	};
 
 	useAutoRefresh(() => {
 		if (stats?.status !== "sold_out") {
@@ -99,7 +147,7 @@ export const GiftDetails = () => {
 					</div>
 					<div className="text-gray-400 text-sm flex items-center gap-2">
 						<RefreshCcw className="h-4 w-4" />
-						Обновлено: {gift.last_updated} <u>UTC +0</u>
+						Обновлено: {formatDateTime(gift.last_updated)}
 					</div>
 				</div>
 
@@ -157,10 +205,7 @@ export const GiftDetails = () => {
 							<Clock className="h-4 w-4 text-green-400" />
 						</div>
 						<div className="text-2xl font-bold text-white">
-							{((parseInt(stats.analytics.peak_hour.hour) + 3) % 24)
-								.toString()
-								.padStart(2, "0")}
-							:00
+							{formatPeakHour(stats.analytics.peak_hour.hour)}
 						</div>
 						<p className="text-xs text-gray-400">
 							{stats.analytics.peak_hour.count.toLocaleString()} покупок
@@ -176,7 +221,7 @@ export const GiftDetails = () => {
 						{stats.status !== "sold_out" && (
 							<p className="text-xs text-gray-400">
 								Ожидаемое завершение:{" "}
-								{stats.analytics.prediction.predicted_sold_out}
+								{formatDateTime(stats.analytics.prediction.predicted_sold_out)}
 							</p>
 						)}
 					</div>
@@ -184,7 +229,7 @@ export const GiftDetails = () => {
 
 				<GiftStats hourlyStats={stats.analytics.hourly_stats} />
 
-				<GiftHistory history={history} />
+				<GiftHistory history={history} formatDateTime={formatDateTime} />
 			</div>
 		</div>
 	);

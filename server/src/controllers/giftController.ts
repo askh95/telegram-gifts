@@ -1,10 +1,21 @@
 import { Request, Response } from "express";
-import { Database } from "sqlite";
+import { Pool } from "pg";
 import { fetchGifts } from "../services/telegramService";
 import { Gift, TelegramGiftResponse } from "../models/Gift";
 import { AnalyticsService } from "../services/analyticsService";
-import axios from "axios";
-import { STATS_UPDATE_INTERVAL, TELEGRAM_BOT_TOKEN } from "../utils/constants";
+
+interface HistoryRecord {
+	remaining_count: number;
+	total_count: number;
+	change_amount: number;
+	last_updated: string;
+	emoji: string;
+	formatted_last_updated: string;
+}
+
+interface GiftWithFormattedDate extends Gift {
+	formatted_last_updated: string;
+}
 interface ExistingGift {
 	telegram_id: string;
 	remaining_count: number;
@@ -27,17 +38,17 @@ interface PaginationQuery {
 }
 
 export class GiftController {
-	private db: Database;
+	private pool: Pool;
 	private analyticsService: AnalyticsService;
 
-	constructor(database: Database) {
-		this.db = database;
-		this.analyticsService = new AnalyticsService(database);
+	constructor(pool: Pool) {
+		this.pool = pool;
+		this.analyticsService = new AnalyticsService(pool);
 	}
 
 	async updateGifts() {
 		try {
-			const activeGifts = await this.db.all<ExistingGift[]>(
+			const { rows: activeGifts } = await this.pool.query<ExistingGift>(
 				"SELECT telegram_id, remaining_count, total_count FROM gifts WHERE status = 'active'"
 			);
 
@@ -46,31 +57,29 @@ export class GiftController {
 				currentGifts.map((g: TelegramGiftResponse) => g.id)
 			);
 
-			const timestamp = new Date().toISOString();
-
 			for (const activeGift of activeGifts) {
 				if (!currentGiftIds.has(activeGift.telegram_id)) {
 					console.log(
 						`Gift ${activeGift.telegram_id} disappeared from API, marking as sold out`
 					);
 
-					await this.db.run(
+					await this.pool.query(
 						`UPDATE gifts 
                         SET status = 'sold_out',
                             remaining_count = 0,
-                            last_updated = CURRENT_TIMESTAMP
-                        WHERE telegram_id = ?`,
+                            last_updated = NOW()
+                        WHERE telegram_id = $1`,
 						[activeGift.telegram_id]
 					);
 
-					await this.db.run(
+					await this.pool.query(
 						`INSERT INTO gifts_history (
                             telegram_id,
                             remaining_count,
                             total_count,
                             change_amount,
                             last_updated
-                        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                        ) VALUES ($1, $2, $3, $4, NOW())`,
 						[
 							activeGift.telegram_id,
 							0,
@@ -86,22 +95,22 @@ export class GiftController {
 
 				if (existingGift) {
 					if (existingGift.remaining_count !== gift.remaining_count) {
-						await this.db.run(
+						await this.pool.query(
 							`UPDATE gifts 
-                            SET remaining_count = ?,
-                                last_updated = CURRENT_TIMESTAMP
-                            WHERE telegram_id = ?`,
+                            SET remaining_count = $1,
+                                last_updated = NOW()
+                            WHERE telegram_id = $2`,
 							[gift.remaining_count, gift.id]
 						);
 
-						await this.db.run(
+						await this.pool.query(
 							`INSERT INTO gifts_history (
                                 telegram_id,
                                 remaining_count,
                                 total_count,
                                 change_amount,
                                 last_updated
-                            ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                            ) VALUES ($1, $2, $3, $4, NOW())`,
 							[
 								gift.id,
 								gift.remaining_count,
@@ -111,7 +120,7 @@ export class GiftController {
 						);
 					}
 				} else {
-					await this.db.run(
+					await this.pool.query(
 						`INSERT INTO gifts (
                             telegram_id, custom_emoji_id, emoji, file_id,
                             file_size, file_unique_id, height, width,
@@ -122,7 +131,8 @@ export class GiftController {
                             thumb_file_id, thumb_file_unique_id,
                             thumb_file_size, thumb_width, thumb_height,
                             last_updated
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 
+                                $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, NOW())`,
 						[
 							gift.id,
 							gift.sticker.custom_emoji_id,
@@ -132,8 +142,8 @@ export class GiftController {
 							gift.sticker.file_unique_id,
 							gift.sticker.height,
 							gift.sticker.width,
-							gift.sticker.is_animated ? 1 : 0,
-							gift.sticker.is_video ? 1 : 0,
+							gift.sticker.is_animated,
+							gift.sticker.is_video,
 							gift.star_count,
 							gift.remaining_count,
 							gift.total_count,
@@ -151,14 +161,14 @@ export class GiftController {
 						]
 					);
 
-					await this.db.run(
+					await this.pool.query(
 						`INSERT INTO gifts_history (
                             telegram_id,
                             remaining_count,
                             total_count,
                             change_amount,
                             last_updated
-                        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                        ) VALUES ($1, $2, $3, $4, NOW())`,
 						[gift.id, gift.remaining_count, gift.total_count, 0]
 					);
 				}
@@ -180,27 +190,28 @@ export class GiftController {
 
 			let baseQuery = `SELECT * FROM gifts WHERE 1=1`;
 			const params: any[] = [];
+			let paramCounter = 1;
 
 			if (req.query.status) {
-				baseQuery += ` AND status = ?`;
+				baseQuery += ` AND status = $${paramCounter++}`;
 				params.push(req.query.status);
 			}
 
 			if (req.query.minStars) {
-				baseQuery += ` AND star_count >= ?`;
+				baseQuery += ` AND star_count >= $${paramCounter++}`;
 				params.push(parseInt(req.query.minStars));
 			}
 			if (req.query.maxStars) {
-				baseQuery += ` AND star_count <= ?`;
+				baseQuery += ` AND star_count <= $${paramCounter++}`;
 				params.push(parseInt(req.query.maxStars));
 			}
 
 			if (req.query.minRemaining) {
-				baseQuery += ` AND remaining_count >= ?`;
+				baseQuery += ` AND remaining_count >= $${paramCounter++}`;
 				params.push(parseInt(req.query.minRemaining));
 			}
 			if (req.query.maxRemaining) {
-				baseQuery += ` AND remaining_count <= ?`;
+				baseQuery += ` AND remaining_count <= $${paramCounter++}`;
 				params.push(parseInt(req.query.maxRemaining));
 			}
 
@@ -212,23 +223,23 @@ export class GiftController {
                     END,
                     remaining_count ASC`;
 
-			const finalQuery = `${queryWithSort} LIMIT ? OFFSET ?`;
+			const finalQuery = `${queryWithSort} LIMIT $${paramCounter++} OFFSET $${paramCounter++}`;
 
-			const [gifts, total] = await Promise.all([
-				this.db.all<Gift[]>(finalQuery, [...params, limit, offset]),
-				this.db.get<{ count: number }>(
-					`SELECT COUNT(*) as count FROM (${baseQuery})`,
+			const [giftsResult, totalResult] = await Promise.all([
+				this.pool.query<Gift>(finalQuery, [...params, limit, offset]),
+				this.pool.query<{ count: string }>(
+					`SELECT COUNT(*) as count FROM (${baseQuery}) AS subquery`,
 					params
 				),
 			]);
 
 			res.json({
-				data: gifts,
+				data: giftsResult.rows,
 				pagination: {
-					total: total?.count || 0,
+					total: parseInt(totalResult.rows[0].count),
 					page,
 					limit,
-					totalPages: Math.ceil((total?.count || 0) / limit),
+					totalPages: Math.ceil(parseInt(totalResult.rows[0].count) / limit),
 				},
 			});
 		} catch (error) {
@@ -239,8 +250,8 @@ export class GiftController {
 
 	async getGiftById(req: Request, res: Response) {
 		try {
-			const [gift, lastPurchase] = await Promise.all([
-				this.db.get<Gift>(
+			const [giftResult, lastPurchaseResult] = await Promise.all([
+				this.pool.query<GiftWithFormattedDate>(
 					`SELECT 
                         telegram_id,
                         custom_emoji_id,
@@ -249,31 +260,35 @@ export class GiftController {
                         remaining_count,
                         total_count,
                         status,
-                        last_updated
+                        to_char(last_updated AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00"') as formatted_last_updated
                     FROM gifts 
-                    WHERE telegram_id = ?`,
-					req.params.id
+                    WHERE telegram_id = $1`,
+					[req.params.id]
 				),
-				this.db.get(
+				this.pool.query(
 					`SELECT 
                         change_amount,
-                        last_updated as last_purchase
+                        to_char(last_updated AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00"') as last_purchase
                     FROM gifts_history 
-                    WHERE telegram_id = ? AND change_amount > 0
+                    WHERE telegram_id = $1 AND change_amount > 0
                     ORDER BY last_updated DESC 
                     LIMIT 1`,
-					req.params.id
+					[req.params.id]
 				),
 			]);
 
-			if (!gift) {
+			if (giftResult.rows.length === 0) {
 				return res.status(404).json({ error: "Gift not found" });
 			}
+
+			const gift = giftResult.rows[0];
+			const lastPurchase = lastPurchaseResult.rows[0];
 
 			res.json({
 				...gift,
 				last_purchase: lastPurchase?.last_purchase || null,
 				last_purchase_amount: lastPurchase?.change_amount || 0,
+				last_updated: gift.formatted_last_updated,
 			});
 		} catch (error) {
 			console.error("Error fetching gift by ID:", error);
@@ -285,102 +300,93 @@ export class GiftController {
 		try {
 			const giftId = req.params.id;
 
-			const gift = await this.db.get<Gift>(
-				"SELECT * FROM gifts WHERE telegram_id = ?",
-				giftId
+			const {
+				rows: [gift],
+			} = await this.pool.query<GiftWithFormattedDate>(
+				`
+                SELECT 
+                    *,
+                    to_char(last_updated AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00"') as formatted_last_updated
+                FROM gifts 
+                WHERE telegram_id = $1`,
+				[giftId]
 			);
 
 			if (!gift) {
 				return res.status(404).json({ error: "Gift not found" });
 			}
 
-			const purchaseHistory = await this.db.all(
+			const { rows: hourlyStats } = await this.pool.query(
 				`
                 WITH time_slots AS (
                     SELECT 
-                        datetime(
-                            (strftime('%s', datetime('now', '-24 hours')) / (? / 1000)) * (? / 1000),
-                            'unixepoch'
-                        ) as slot_start,
-                        ? / 1000 as slot_duration
-                    UNION ALL
+                        generate_series(
+                            date_trunc('hour', NOW() AT TIME ZONE 'UTC' - interval '24 hours'),
+                            date_trunc('hour', NOW() AT TIME ZONE 'UTC'),
+                            interval '1 hour'
+                        ) AS hour
+                ),
+                hourly_purchases AS (
                     SELECT 
-                        datetime(
-                            strftime('%s', slot_start) + slot_duration,
-                            'unixepoch'
-                        ),
-                        slot_duration
-                    FROM time_slots
-                    WHERE datetime(slot_start) < datetime('now')
-                    LIMIT 288
+                        date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC') as hour,
+                        COALESCE(SUM(gh.change_amount), 0)::INTEGER as purchase_count
+                    FROM gifts_history gh
+                    WHERE 
+                        gh.telegram_id = $1 
+                        AND gh.last_updated >= NOW() AT TIME ZONE 'UTC' - interval '24 hours'
+                    GROUP BY date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC')
                 )
                 SELECT 
-                    time_slots.slot_start as timestamp,
-                    COALESCE(SUM(gh.change_amount), 0) as change_amount,
-                    MAX(gh.remaining_count) as remaining_count,
-                    MIN(gh.remaining_count) as min_remaining_count,
-                    gh.total_count
-                FROM time_slots
-                LEFT JOIN gifts_history gh ON 
-                    datetime(gh.last_updated) >= datetime(time_slots.slot_start) AND 
-                    datetime(gh.last_updated) < datetime(
-                        time_slots.slot_start, 
-                        '+' || (? / 1000) || ' seconds'
-                    ) AND
-                    gh.telegram_id = ?
-                GROUP BY time_slots.slot_start
-                ORDER BY time_slots.slot_start ASC
-                `,
-				[
-					STATS_UPDATE_INTERVAL,
-					STATS_UPDATE_INTERVAL,
-					STATS_UPDATE_INTERVAL,
-					STATS_UPDATE_INTERVAL,
-					giftId,
-				]
+                    to_char(ts.hour AT TIME ZONE 'UTC', 'HH24:00') as hour,
+                    COALESCE(hp.purchase_count, 0) as count
+                FROM time_slots ts
+                LEFT JOIN hourly_purchases hp ON ts.hour = hp.hour
+                ORDER BY ts.hour`,
+				[giftId]
 			);
 
-			const hourlyStats = new Map<string, number>();
-			purchaseHistory.forEach((record) => {
-				const hourEnd = new Date(record.timestamp).getHours() + 1;
-				const hour = (hourEnd % 24).toString().padStart(2, "0") + ":00";
-				hourlyStats.set(
-					hour,
-					(hourlyStats.get(hour) || 0) + record.change_amount
-				);
-			});
+			// Get current hour purchases
+			const {
+				rows: [currentHourStats],
+			} = await this.pool.query(
+				`
+                SELECT 
+                    COALESCE(SUM(change_amount), 0)::INTEGER as count
+                FROM gifts_history
+                WHERE 
+                    telegram_id = $1
+                    AND last_updated >= date_trunc('hour', NOW() AT TIME ZONE 'UTC')
+                    AND last_updated < NOW() AT TIME ZONE 'UTC'`,
+				[giftId]
+			);
 
-			let peakHour = "00:00";
-			let peakCount = 0;
-			hourlyStats.forEach((count, hour) => {
-				if (count > peakCount) {
-					peakCount = count;
-					peakHour = hour;
+			const minutesInCurrentHour = new Date().getUTCMinutes();
+			const currentHourPurchases = currentHourStats.count;
+			const currentRate =
+				minutesInCurrentHour > 0
+					? Math.round((currentHourPurchases / minutesInCurrentHour) * 60)
+					: currentHourPurchases;
+
+			let peakHourData = { hour: "00:00", count: 0 };
+			for (const stat of hourlyStats) {
+				if (stat.count > peakHourData.count) {
+					peakHourData = stat;
 				}
-			});
+			}
 
-			const hourlyStatsArray = Array.from(hourlyStats.entries())
-				.map(([hour, count]) => ({
-					hour,
-					count: Math.round(count),
-				}))
-				.filter((stat) => stat.count > 0)
-				.sort((a, b) => a.hour.localeCompare(b.hour));
-
-			const totalPurchases = hourlyStatsArray.reduce(
+			const total24hPurchases = hourlyStats.reduce(
 				(sum, stat) => sum + stat.count,
 				0
 			);
-			const avgHourlyRate = Math.ceil(totalPurchases / hourlyStatsArray.length);
 
-			let predictedSoldOutDate = null;
-			if (avgHourlyRate > 0 && gift.remaining_count > 0) {
-				const hoursRemaining = Math.ceil(gift.remaining_count / avgHourlyRate);
-				predictedSoldOutDate = new Date();
-				predictedSoldOutDate.setHours(
-					predictedSoldOutDate.getHours() + hoursRemaining
-				);
-			}
+			const prediction = await this.analyticsService.updatePrediction(giftId);
+
+			const hourlyStatsFiltered = hourlyStats
+				.filter((stat) => stat.count > 0)
+				.map((stat) => ({
+					hour: stat.hour,
+					count: stat.count,
+				}));
 
 			const response = {
 				gift_id: giftId,
@@ -389,28 +395,30 @@ export class GiftController {
 				status: gift.status,
 				analytics: {
 					peak_hour: {
-						hour: peakHour,
-						count: Math.round(peakCount),
+						hour: peakHourData.hour,
+						count: peakHourData.count,
 					},
-					purchase_rate: avgHourlyRate,
-					prediction: {
-						remaining: gift.remaining_count,
-						predicted_sold_out: predictedSoldOutDate?.toISOString() || null,
-						confidence: totalPurchases > 0 ? 0.8 : 0,
-						avg_hourly_rate: avgHourlyRate,
-						total_purchases_24h: totalPurchases,
-					},
-					hourly_stats: hourlyStatsArray,
+					purchase_rate: currentRate,
+					prediction: prediction
+						? {
+								remaining: gift.remaining_count,
+								predicted_sold_out: prediction.predicted_sold_out_date,
+								confidence: prediction.confidence,
+								avg_hourly_rate: Math.round(total24hPurchases / 24),
+								total_purchases_24h: total24hPurchases,
+						  }
+						: null,
+					hourly_stats: hourlyStatsFiltered,
 				},
-				last_updated: gift.last_updated,
-				interval_minutes: STATS_UPDATE_INTERVAL / 60000,
+				last_updated: gift.formatted_last_updated,
 			};
 
 			res.json(response);
 		} catch (error) {
-			console.error("Error in getGiftStats:", error);
+			console.error("Error getting gift stats:", error);
 			res.status(500).json({
 				error: "Failed to fetch gift statistics",
+				details: error instanceof Error ? error.message : "Unknown error",
 			});
 		}
 	}
@@ -425,7 +433,6 @@ export class GiftController {
 			const limit = parseInt(req.query.limit || "30");
 			const startDate = req.query.startDate;
 			const endDate = req.query.endDate;
-
 			const minChange = req.query.minChange
 				? parseInt(req.query.minChange)
 				: undefined;
@@ -434,114 +441,78 @@ export class GiftController {
 				: undefined;
 
 			let query = `
-        SELECT 
-          h.remaining_count,
-          h.total_count,
-          h.change_amount,
-          h.last_updated,
-          g.emoji
-        FROM gifts_history h
-        JOIN gifts g ON g.telegram_id = h.telegram_id
-        WHERE h.telegram_id = ?
-      `;
+                SELECT 
+                    h.remaining_count,
+                    h.total_count,
+                    h.change_amount,
+                    h.last_updated,
+                    to_char(h.last_updated, 'YYYY-MM-DD"T"HH24:MI:SS.MSOF') as formatted_last_updated,
+                    g.emoji
+                FROM gifts_history h
+                JOIN gifts g ON g.telegram_id = h.telegram_id
+                WHERE h.telegram_id = $1
+            `;
+
 			const params: any[] = [giftId];
+			let paramCounter = 2;
 
 			if (startDate) {
-				query += " AND h.last_updated >= ?";
+				query += ` AND h.last_updated >= $${paramCounter++}`;
 				params.push(startDate);
 			}
 			if (endDate) {
-				query += " AND h.last_updated <= ?";
+				query += ` AND h.last_updated <= $${paramCounter++}`;
 				params.push(endDate);
 			}
 			if (minChange !== undefined) {
-				query += " AND h.change_amount >= ?";
+				query += ` AND h.change_amount >= $${paramCounter++}`;
 				params.push(minChange);
 			}
 			if (maxChange !== undefined) {
-				query += " AND h.change_amount <= ?";
+				query += ` AND h.change_amount <= $${paramCounter++}`;
 				params.push(maxChange);
 			}
 
-			const [history, total] = await Promise.all([
-				this.db.all(
+			const [historyResult, totalResult] = await Promise.all([
+				this.pool.query<HistoryRecord>(
 					query +
 						` 
-          ORDER BY h.last_updated DESC
-          LIMIT ? OFFSET ?`,
+                    ORDER BY h.last_updated DESC
+                    LIMIT $${paramCounter++} OFFSET $${paramCounter++}`,
 					[...params, limit, (page - 1) * limit]
 				),
-				this.db.get<{ count: number }>(
+				this.pool.query<{ count: string }>(
 					`SELECT COUNT(*) as count FROM (${query}) as subquery`,
 					params
 				),
 			]);
 
-			if (history.length === 0) {
+			if (historyResult.rows.length === 0) {
 				return res
 					.status(404)
 					.json({ error: "No history found for this gift" });
 			}
 
+			const formattedData = historyResult.rows.map((record) => ({
+				remaining_count: record.remaining_count,
+				total_count: record.total_count,
+				change_amount: record.change_amount,
+				emoji: record.emoji,
+				last_updated: record.formatted_last_updated,
+			}));
+
 			res.json({
-				data: history,
+				data: formattedData,
 				pagination: {
-					total: total?.count || 0,
+					total: parseInt(totalResult.rows[0].count),
 					page,
 					limit,
-					totalPages: Math.ceil((total?.count || 0) / limit),
+					totalPages: Math.ceil(parseInt(totalResult.rows[0].count) / limit),
 				},
 			});
 		} catch (error) {
 			console.error("Error fetching gift history:", error);
 			res.status(500).json({ error: "Failed to fetch gift history" });
-		}
-	}
-
-	async getGiftSticker(req: Request, res: Response) {
-		try {
-			const giftId = req.params.id;
-
-			const gift = await this.db.get<Gift>(
-				"SELECT file_id, thumbnail_file_id, thumb_file_id FROM gifts WHERE telegram_id = ?",
-				giftId
-			);
-
-			if (!gift) {
-				return res.status(404).json({ error: "Gift not found" });
-			}
-
-			try {
-				const response = await axios.get(
-					`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile`,
-					{
-						params: {
-							file_id: gift.file_id,
-						},
-					}
-				);
-
-				if (response.data.ok) {
-					const filePath = response.data.result.file_path;
-					const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${filePath}`;
-
-					res.json({
-						file_url: fileUrl,
-						thumbnail_file_id: gift.thumbnail_file_id,
-						thumb_file_id: gift.thumb_file_id,
-					});
-				} else {
-					res.status(400).json({ error: "Failed to get sticker file" });
-				}
-			} catch (error) {
-				console.error("Telegram API error:", error);
-				res
-					.status(500)
-					.json({ error: "Failed to fetch sticker from Telegram" });
-			}
-		} catch (error) {
-			console.error("Error getting gift sticker:", error);
-			res.status(500).json({ error: "Failed to get sticker information" });
 		}
 	}
 }

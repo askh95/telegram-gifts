@@ -1,5 +1,8 @@
 import { Gift } from "../types/gift";
 import { Star, Clock } from "lucide-react";
+import dayjs from "dayjs";
+import "dayjs/locale/ru";
+import { useUserTimezone } from "../hooks/useUserTimezone";
 
 interface GiftCardProps {
 	gift: Gift;
@@ -7,9 +10,18 @@ interface GiftCardProps {
 }
 
 export const GiftCard = ({ gift, onClick }: GiftCardProps) => {
+	const { offset } = useUserTimezone();
+
 	const percentComplete =
 		((gift.total_count - gift.remaining_count) / gift.total_count) * 100;
 	const isSoldOut = gift.status === "sold_out";
+
+	const formatLastUpdated = (timestamp: string) => {
+		const date = dayjs(timestamp);
+		const localDate = date.add(offset, "hour");
+		const sign = offset >= 0 ? "+" : "";
+		return `${localDate.format("DD.MM.YYYY HH:mm")} (UTC ${sign}${offset})`;
+	};
 
 	return (
 		<div
@@ -71,8 +83,7 @@ export const GiftCard = ({ gift, onClick }: GiftCardProps) => {
 						<div className="flex items-center justify-center sm:justify-start gap-2 text-xs sm:text-sm text-gray-400">
 							<Clock className="h-3 w-3 sm:h-4 sm:w-4" />
 							<span className="text-center sm:text-left">
-								Обновлено {new Date(gift.last_updated).toLocaleString()}{" "}
-								<u>UTC +0</u>
+								Обновлено {formatLastUpdated(gift.last_updated)}
 							</span>
 						</div>
 					</div>
