@@ -1,5 +1,4 @@
 import { Pool } from "pg";
-import * as tf from "@tensorflow/tfjs-node";
 import moment from "moment";
 
 export interface PredictionResult {
@@ -19,15 +18,8 @@ export interface PurchaseStats {
 	purchaseTrend: "increasing" | "decreasing" | "stable";
 }
 
-interface ModelCache {
-	model: tf.Sequential;
-	lastUpdated: Date;
-	weights: tf.Tensor[];
-}
-
 export class AnalyticsService {
 	private pool: Pool;
-	private models: Map<string, ModelCache> = new Map();
 
 	constructor(pool: Pool) {
 		this.pool = pool;
@@ -61,14 +53,6 @@ export class AnalyticsService {
                 FOREIGN KEY (gift_id) REFERENCES gifts(telegram_id)
             )
         `);
-
-		await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS model_weights (
-                gift_id TEXT PRIMARY KEY,
-                weights TEXT NOT NULL,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
 	}
 
 	async getPurchaseStats(giftId: string): Promise<PurchaseStats> {
@@ -95,7 +79,6 @@ export class AnalyticsService {
 		);
 
 		const averagePurchaseSize = totalPurchases / purchaseHistory.length || 0;
-
 		const trend = this.calculatePurchaseTrend(purchaseHistory);
 
 		await this.saveAnalytics(giftId, {
@@ -122,17 +105,15 @@ export class AnalyticsService {
 		giftId: string
 	): Promise<PredictionResult | null> {
 		const { rows } = await this.pool.query<PredictionResult>(
-			`
-          SELECT 
-            predicted_sold_out_date,
-            confidence,
-            prediction_data,
-            created_at
-          FROM gift_predictions
-          WHERE gift_id = $1
-          ORDER BY created_at DESC
-          LIMIT 1
-        `,
+			`SELECT 
+                predicted_sold_out_date,
+                confidence,
+                prediction_data,
+                created_at
+            FROM gift_predictions
+            WHERE gift_id = $1
+            ORDER BY created_at DESC
+            LIMIT 1`,
 			[giftId]
 		);
 
@@ -143,8 +124,7 @@ export class AnalyticsService {
 		giftId: string
 	): Promise<PredictionResult | null> {
 		try {
-			const modelData = await this.getOrTrainModel(giftId);
-			const prediction = await this.makePrediction(giftId);
+			const prediction = await this.calculatePrediction(giftId);
 			await this.savePrediction(giftId, prediction);
 			return prediction;
 		} catch (error) {
@@ -153,201 +133,219 @@ export class AnalyticsService {
 		}
 	}
 
-	private async getOrTrainModel(giftId: string): Promise<ModelCache> {
-		const cachedModel = this.models.get(giftId);
-
-		if (
-			cachedModel &&
-			moment(cachedModel.lastUpdated).isAfter(moment().subtract(1, "hour"))
-		) {
-			return cachedModel;
-		}
-
-		const {
-			rows: [savedWeights],
-		} = await this.pool.query(
-			`SELECT weights, updated_at
-            FROM model_weights
-            WHERE gift_id = $1`,
-			[giftId]
-		);
-
-		if (
-			savedWeights &&
-			moment(savedWeights.updated_at).isAfter(moment().subtract(1, "hour"))
-		) {
-			const model = await this.loadModel(JSON.parse(savedWeights.weights));
-			const modelCache = {
-				model,
-				lastUpdated: new Date(savedWeights.updated_at),
-				weights: await model.getWeights(),
-			};
-			this.models.set(giftId, modelCache);
-			return modelCache;
-		}
-
-		return await this.trainNewModel(giftId);
-	}
-
-	private async trainNewModel(giftId: string): Promise<ModelCache> {
-		const { rows: history } = await this.pool.query(
-			`SELECT 
-                EXTRACT(EPOCH FROM last_updated) as timestamp,
-                remaining_count,
-                total_count,
-                change_amount
-            FROM gifts_history 
-            WHERE telegram_id = $1
-            ORDER BY last_updated ASC`,
-			[giftId]
-		);
-
-		if (history.length < 24) {
-			throw new Error("Insufficient data for training");
-		}
-
-		const timestamps = history.map((h) => parseInt(h.timestamp));
-		const counts = history.map((h) => h.remaining_count);
-		const changes = history.map((h) => h.change_amount || 0);
-
-		const normalizedData = this.normalizeData(timestamps, counts, changes);
-
-		const model = tf.sequential();
-		model.add(
-			tf.layers.dense({ units: 64, activation: "relu", inputShape: [3] })
-		);
-		model.add(tf.layers.dropout({ rate: 0.2 }));
-		model.add(tf.layers.dense({ units: 32, activation: "relu" }));
-		model.add(tf.layers.dense({ units: 1 }));
-
-		model.compile({
-			optimizer: tf.train.adam(0.001),
-			loss: "meanSquaredError",
-		});
-
-		await model.fit(normalizedData.inputs, normalizedData.outputs, {
-			epochs: 100,
-			batchSize: 32,
-			validationSplit: 0.2,
-			shuffle: true,
-			verbose: 0,
-		});
-
-		const weights = await model.getWeights();
-		const weightsData = weights.map((w) => ({
-			data: Array.from(w.dataSync()),
-			shape: w.shape,
-		}));
-
-		await this.pool.query(
-			`INSERT INTO model_weights (gift_id, weights, updated_at)
-            VALUES ($1, $2, CURRENT_TIMESTAMP)
-            ON CONFLICT (gift_id) DO UPDATE
-            SET weights = EXCLUDED.weights, updated_at = CURRENT_TIMESTAMP`,
-			[giftId, JSON.stringify(weightsData)]
-		);
-
-		const modelCache = {
-			model,
-			lastUpdated: new Date(),
-			weights,
-		};
-		this.models.set(giftId, modelCache);
-
-		return modelCache;
-	}
-
-	private async makePrediction(giftId: string): Promise<PredictionResult> {
+	private async calculatePrediction(giftId: string): Promise<PredictionResult> {
 		try {
-			const { rows: history } = await this.pool.query(
-				`SELECT 
-                    last_updated at time zone 'UTC' as timestamp,
-                    remaining_count,
-                    change_amount
-                FROM gifts_history 
-                WHERE telegram_id = $1 
-                    AND change_amount > 0
-                ORDER BY last_updated ASC`,
-				[giftId]
-			);
+			const [
+				{ rows: history },
+				{
+					rows: [currentGift],
+				},
+			] = await Promise.all([
+				this.pool.query(
+					`SELECT 
+                        last_updated at time zone 'UTC' as timestamp,
+                        remaining_count,
+                        change_amount
+                    FROM gifts_history 
+                    WHERE telegram_id = $1 
+                        AND last_updated >= NOW() - INTERVAL '24 hours'
+                        AND change_amount > 0
+                    ORDER BY last_updated ASC`,
+					[giftId]
+				),
+				this.pool.query(
+					`SELECT remaining_count, total_count
+                    FROM gifts 
+                    WHERE telegram_id = $1`,
+					[giftId]
+				),
+			]);
 
-			if (history.length < 2) {
-				throw new Error("Insufficient data for prediction");
+			if (!currentGift || history.length < 2) {
+				return {
+					predicted_sold_out_date: null,
+					confidence: 0,
+					prediction_data: JSON.stringify({
+						error: "Insufficient data for prediction",
+					}),
+				};
 			}
 
 			const totalSold = history.reduce(
 				(sum, record) => sum + record.change_amount,
 				0
 			);
-			const timeStart = new Date(history[0].timestamp);
-			const timeEnd = new Date(history[history.length - 1].timestamp);
-			const hoursElapsed = Math.max(
-				1,
-				(timeEnd.getTime() - timeStart.getTime()) / (1000 * 60 * 60)
-			);
+			const timeStart = moment(history[0].timestamp);
+			const timeEnd = moment(history[history.length - 1].timestamp);
+			const hoursElapsed = Math.max(1, timeEnd.diff(timeStart, "hours", true));
 
-			const hourlyRate = totalSold / hoursElapsed;
+			const baseHourlyRate = totalSold / hoursElapsed;
 
-			const {
-				rows: [currentGift],
-			} = await this.pool.query(
-				`SELECT remaining_count
-                FROM gifts 
-                WHERE telegram_id = $1`,
-				[giftId]
-			);
+			const recentHistory = history.slice(-6);
+			const recentRate = this.calculateRecentRate(recentHistory);
 
-			if (!currentGift) {
-				throw new Error("Gift not found");
-			}
+			const weightedRate = baseHourlyRate * 0.7 + recentRate * 0.3;
 
-			const hoursRemaining = Math.ceil(
-				currentGift.remaining_count / hourlyRate
-			);
+			const hourlyFactors = this.calculateHourlyFactors(history);
+			const currentHour = moment().hour();
+			const adjustedRate = weightedRate * (hourlyFactors[currentHour] || 1);
+
+			const remainingCount = currentGift.remaining_count;
+			const hoursRemaining = Math.ceil(remainingCount / adjustedRate);
+
+			const confidence = this.calculateConfidence({
+				historyLength: history.length,
+				hourlyVariation: this.calculateHourlyVariation(history),
+				trendStability: this.calculateTrendStability(history),
+				remainingPercentage: remainingCount / currentGift.total_count,
+			});
+
 			const predictedSoldOut = moment()
 				.add(hoursRemaining, "hours")
 				.format("YYYY-MM-DD[T]HH:mm:ss.SSS[+00]");
-
-			const hourlyVariation = this.calculateHourlyVariation(history);
-			const confidence = Math.max(0.7, 1 - hourlyVariation);
 
 			return {
 				predicted_sold_out_date: predictedSoldOut,
 				confidence,
 				prediction_data: JSON.stringify({
-					total_sold: totalSold,
-					hours_tracked: hoursElapsed,
-					hourly_rate: hourlyRate,
+					base_rate: baseHourlyRate,
+					recent_rate: recentRate,
+					weighted_rate: weightedRate,
+					adjusted_rate: adjustedRate,
+					remaining_count: remainingCount,
 					hours_remaining: hoursRemaining,
+					hourly_factors: hourlyFactors,
 				}),
 			};
 		} catch (error) {
-			console.error("Prediction error:", error);
+			console.error("Prediction calculation error:", error);
 			return {
 				predicted_sold_out_date: null,
 				confidence: 0,
 				prediction_data: JSON.stringify({
-					error: "Insufficient data for prediction",
+					error: "Prediction calculation failed",
 				}),
 			};
 		}
+	}
+
+	private calculateRecentRate(history: any[]): number {
+		if (history.length < 2) return 0;
+
+		const recentSales = history.reduce(
+			(sum, record) => sum + record.change_amount,
+			0
+		);
+		const timeSpan = moment(history[history.length - 1].timestamp).diff(
+			moment(history[0].timestamp),
+			"hours",
+			true
+		);
+
+		return timeSpan > 0 ? recentSales / timeSpan : 0;
+	}
+
+	private calculateHourlyFactors(history: any[]): { [hour: number]: number } {
+		const hourlyTotals: { [hour: number]: number } = {};
+		const hourlyCounts: { [hour: number]: number } = {};
+
+		history.forEach((record) => {
+			const hour = moment(record.timestamp).hour();
+			hourlyTotals[hour] = (hourlyTotals[hour] || 0) + record.change_amount;
+			hourlyCounts[hour] = (hourlyCounts[hour] || 0) + 1;
+		});
+
+		const hourlyAverages: { [hour: number]: number } = {};
+		Object.keys(hourlyTotals).forEach((hour) => {
+			const numHour = parseInt(hour);
+			hourlyAverages[numHour] = hourlyTotals[numHour] / hourlyCounts[numHour];
+		});
+
+		const avgValue =
+			Object.values(hourlyAverages).reduce((sum, val) => sum + val, 0) /
+			Object.values(hourlyAverages).length;
+
+		const factors: { [hour: number]: number } = {};
+		Object.keys(hourlyAverages).forEach((hour) => {
+			const numHour = parseInt(hour);
+			factors[numHour] = hourlyAverages[numHour] / avgValue;
+		});
+
+		return factors;
+	}
+
+	private calculateConfidence(params: {
+		historyLength: number;
+		hourlyVariation: number;
+		trendStability: number;
+		remainingPercentage: number;
+	}): number {
+		const {
+			historyLength,
+			hourlyVariation,
+			trendStability,
+			remainingPercentage,
+		} = params;
+
+		let baseConfidence = Math.min(1, historyLength / 24);
+
+		const variationFactor = 1 - Math.min(1, hourlyVariation);
+
+		const stabilityFactor = Math.min(1, trendStability);
+
+		const remainingFactor = 1 - Math.min(1, remainingPercentage);
+
+		const confidence =
+			baseConfidence * 0.3 +
+			variationFactor * 0.3 +
+			stabilityFactor * 0.2 +
+			remainingFactor * 0.2;
+
+		return Math.max(0, Math.min(1, confidence));
 	}
 
 	private calculateHourlyVariation(history: any[]): number {
 		const hourlyMap = new Map<number, number>();
 
 		history.forEach((record) => {
-			const hour = new Date(record.timestamp).getHours();
+			const hour = moment(record.timestamp).hour();
 			hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + record.change_amount);
 		});
 
 		const values = Array.from(hourlyMap.values());
+		if (values.length === 0) return 1;
+
 		const avg = values.reduce((a, b) => a + b, 0) / values.length;
 		const variance =
 			values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) /
 			values.length;
 
 		return Math.min(1, Math.sqrt(variance) / avg);
+	}
+
+	private calculateTrendStability(history: any[]): number {
+		if (history.length < 4) return 0;
+
+		const rates: number[] = [];
+		for (let i = 1; i < history.length; i++) {
+			const timeDiff = moment(history[i].timestamp).diff(
+				moment(history[i - 1].timestamp),
+				"hours",
+				true
+			);
+			if (timeDiff > 0) {
+				rates.push(history[i].change_amount / timeDiff);
+			}
+		}
+
+		if (rates.length < 3) return 0;
+
+		const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+		const variance =
+			rates.reduce((sum, rate) => sum + Math.pow(rate - avgRate, 2), 0) /
+			rates.length;
+
+		return 1 / (1 + Math.sqrt(variance) / avgRate);
 	}
 
 	private async saveAnalytics(
@@ -410,115 +408,15 @@ export class AnalyticsService {
 		);
 	}
 
-	public async cleanup() {
-		try {
-			await this.pool.query(`
-                DELETE FROM gift_predictions
-                WHERE created_at < NOW() - INTERVAL '7 days'
-            `);
-
-			for (const [giftId, modelCache] of this.models.entries()) {
-				if (
-					moment(modelCache.lastUpdated).isBefore(moment().subtract(1, "day"))
-				) {
-					modelCache.weights.forEach((w) => w.dispose());
-					modelCache.model.dispose();
-					this.models.delete(giftId);
-				}
-			}
-		} catch (error) {
-			console.error("Error during cleanup:", error);
-		}
-	}
-
-	public async getGlobalStats() {
-		try {
-			const {
-				rows: [stats],
-			} = await this.pool.query(`
-                SELECT 
-                    COUNT(DISTINCT g.telegram_id) as total_gifts,
-                    SUM(CASE WHEN g.status = 'active' THEN 1 ELSE 0 END) as active_gifts,
-                    SUM(CASE WHEN g.status = 'sold_out' THEN 1 ELSE 0 END) as sold_out_gifts,
-                    AVG(ga.purchase_rate) as avg_purchase_rate,
-                    MAX(ga.peak_purchase_count) as max_peak_purchases,
-                    SUM(ga.total_purchases) as total_purchases_24h
-                FROM gifts g
-                LEFT JOIN gift_analytics ga ON g.telegram_id = ga.gift_id
-                WHERE ga.last_updated >= NOW() - INTERVAL '24 hours'
-            `);
-
-			const { rows: trends } = await this.pool.query(`
-                SELECT trend, COUNT(*) as count
-                FROM gift_analytics
-                WHERE last_updated >= NOW() - INTERVAL '24 hours'
-                GROUP BY trend
-            `);
-
-			return {
-				...stats,
-				trends: trends.reduce(
-					(acc, { trend, count }) => ({
-						...acc,
-						[trend]: count,
-					}),
-					{}
-				),
-			};
-		} catch (error) {
-			console.error("Error getting global stats:", error);
-			throw error;
-		}
-	}
-
-	public async getHighPriorityGifts() {
-		try {
-			const { rows } = await this.pool.query(`
-                SELECT 
-                    g.telegram_id,
-                    g.emoji,
-                    g.remaining_count,
-                    g.total_count,
-                    gp.predicted_sold_out_date,
-                    gp.confidence,
-                    ga.purchase_rate
-                FROM gifts g
-                JOIN (
-                    SELECT DISTINCT ON (gift_id)
-                        gift_id,
-                        predicted_sold_out_date,
-                        confidence
-                    FROM gift_predictions
-                    ORDER BY gift_id, created_at DESC
-                ) gp ON g.telegram_id = gp.gift_id
-                JOIN gift_analytics ga ON g.telegram_id = ga.gift_id
-                WHERE g.status = 'active'
-                    AND (
-                        (gp.predicted_sold_out_date IS NOT NULL 
-                         AND gp.predicted_sold_out_date <= NOW() + INTERVAL '24 hours')
-                        OR
-                        (g.remaining_count <= g.total_count * 0.1)
-                    )
-                    AND gp.confidence >= 0.7
-                ORDER BY 
-                    CASE 
-                        WHEN g.remaining_count <= g.total_count * 0.1 THEN 1
-                        ELSE 2
-                    END,
-                    gp.predicted_sold_out_date
-            `);
-
-			return rows;
-		} catch (error) {
-			console.error("Error getting high priority gifts:", error);
-			throw error;
-		}
-	}
-
 	private groupPurchasesByHour(
 		history: any[]
 	): Array<{ hour: string; count: number }> {
 		const hourlyMap = new Map<string, number>();
+
+		for (let i = 0; i < 24; i++) {
+			const hour = i.toString().padStart(2, "0") + ":00";
+			hourlyMap.set(hour, 0);
+		}
 
 		for (let i = 1; i < history.length; i++) {
 			const hour = moment(history[i].timestamp).format("HH:00");
@@ -545,122 +443,192 @@ export class AnalyticsService {
 	}
 
 	private async calculateCurrentPurchaseRate(giftId: string): Promise<number> {
-		const {
-			rows: [result],
-		} = await this.pool.query(
-			`
-            WITH current_count AS (
-                SELECT remaining_count 
-                FROM gifts 
-                WHERE telegram_id = $1
-            ),
-            previous_count AS (
-                SELECT remaining_count
+		const { rows } = await this.pool.query(
+			`WITH recent_changes AS (
+                SELECT 
+                    remaining_count,
+                    last_updated,
+                    LAG(remaining_count) OVER (ORDER BY last_updated) as prev_count,
+                    LAG(last_updated) OVER (ORDER BY last_updated) as prev_updated
                 FROM gifts_history
-                WHERE telegram_id = $1 
-                    AND last_updated < NOW() - INTERVAL '1 hour'
-                ORDER BY last_updated DESC 
-                LIMIT 1
+                WHERE telegram_id = $1
+                AND last_updated >= NOW() - INTERVAL '6 hours'
+                ORDER BY last_updated DESC
             )
             SELECT 
-                current_count.remaining_count as current_count,
-                previous_count.remaining_count as previous_count
-            FROM current_count
-            CROSS JOIN previous_count
-        `,
+                SUM(prev_count - remaining_count) as total_change,
+                MAX(last_updated) - MIN(last_updated) as time_span
+            FROM recent_changes
+            WHERE prev_count IS NOT NULL`,
 			[giftId]
 		);
 
-		if (!result) return 0;
+		const result = rows[0];
+		if (!result?.total_change || !result?.time_span) return 0;
 
-		const { current_count, previous_count } = result;
-		return (previous_count - current_count) / 3600;
+		const hours = moment.duration(result.time_span).asHours();
+		return hours > 0 ? result.total_change / hours : 0;
 	}
 
 	private calculatePurchaseTrend(
 		history: any[]
 	): "increasing" | "decreasing" | "stable" {
-		if (history.length < 2) return "stable";
+		if (history.length < 6) return "stable";
 
-		const firstHalf = history.slice(0, Math.floor(history.length / 2));
-		const secondHalf = history.slice(Math.floor(history.length / 2));
+		const partSize = Math.floor(history.length / 3);
+		const parts = [
+			history.slice(0, partSize),
+			history.slice(partSize, partSize * 2),
+			history.slice(partSize * 2),
+		];
 
-		const firstHalfRate = this.calculateAverageRate(firstHalf);
-		const secondHalfRate = this.calculateAverageRate(secondHalf);
+		const rates = parts.map((part) => {
+			if (part.length < 2) return 0;
+			const timeDiff = moment(part[part.length - 1].timestamp).diff(
+				moment(part[0].timestamp),
+				"hours",
+				true
+			);
+			const salesDiff =
+				part[0].remaining_count - part[part.length - 1].remaining_count;
+			return timeDiff > 0 ? salesDiff / timeDiff : 0;
+		});
 
-		const difference = secondHalfRate - firstHalfRate;
-		const threshold = 0.1;
+		const threshold = 0.15;
+		const firstChange = (rates[1] - rates[0]) / rates[0];
+		const secondChange = (rates[2] - rates[1]) / rates[1];
 
-		if (difference > threshold) return "increasing";
-		if (difference < -threshold) return "decreasing";
+		if (firstChange > threshold && secondChange > threshold) {
+			return "increasing";
+		} else if (firstChange < -threshold && secondChange < -threshold) {
+			return "decreasing";
+		}
+
 		return "stable";
 	}
 
-	private calculateAverageRate(history: any[]): number {
-		if (history.length < 2) return 0;
+	public async getHighPriorityGifts() {
+		try {
+			const { rows } = await this.pool.query(`
+                WITH recent_analytics AS (
+                    SELECT DISTINCT ON (gift_id)
+                        gift_id,
+                        purchase_rate,
+                        trend,
+                        last_updated
+                    FROM gift_analytics
+                    WHERE last_updated >= NOW() - INTERVAL '1 hour'
+                    ORDER BY gift_id, last_updated DESC
+                ),
+                recent_predictions AS (
+                    SELECT DISTINCT ON (gift_id)
+                        gift_id,
+                        predicted_sold_out_date,
+                        confidence
+                    FROM gift_predictions
+                    WHERE created_at >= NOW() - INTERVAL '1 hour'
+                    ORDER BY gift_id, created_at DESC
+                )
+                SELECT 
+                    g.telegram_id,
+                    g.emoji,
+                    g.remaining_count,
+                    g.total_count,
+                    rp.predicted_sold_out_date,
+                    rp.confidence,
+                    ra.purchase_rate,
+                    ra.trend
+                FROM gifts g
+                JOIN recent_analytics ra ON g.telegram_id = ra.gift_id
+                LEFT JOIN recent_predictions rp ON g.telegram_id = rp.gift_id
+                WHERE g.status = 'active'
+                    AND (
+                        (rp.predicted_sold_out_date IS NOT NULL 
+                         AND rp.predicted_sold_out_date <= NOW() + INTERVAL '24 hours')
+                        OR
+                        (g.remaining_count <= g.total_count * 0.1)
+                        OR
+                        (ra.trend = 'increasing' AND ra.purchase_rate > 0)
+                    )
+                ORDER BY 
+                    CASE 
+                        WHEN g.remaining_count <= g.total_count * 0.1 THEN 1
+                        WHEN rp.predicted_sold_out_date <= NOW() + INTERVAL '12 hours' THEN 2
+                        WHEN ra.trend = 'increasing' THEN 3
+                        ELSE 4
+                    END,
+                    rp.predicted_sold_out_date NULLS LAST`);
 
-		let totalChanges = 0;
-		for (let i = 1; i < history.length; i++) {
-			totalChanges +=
-				history[i - 1].remaining_count - history[i].remaining_count;
+			return rows;
+		} catch (error) {
+			console.error("Error getting high priority gifts:", error);
+			throw error;
 		}
-
-		const timeSpan = moment(history[history.length - 1].timestamp).diff(
-			moment(history[0].timestamp),
-			"hours",
-			true
-		);
-
-		return timeSpan > 0 ? totalChanges / timeSpan : 0;
 	}
 
-	private async loadModel(weightsData: any[]): Promise<tf.Sequential> {
-		const model = tf.sequential();
-		model.add(
-			tf.layers.dense({ units: 64, activation: "relu", inputShape: [3] })
-		);
-		model.add(tf.layers.dropout({ rate: 0.2 }));
-		model.add(tf.layers.dense({ units: 32, activation: "relu" }));
-		model.add(tf.layers.dense({ units: 1 }));
+	public async getGlobalStats() {
+		try {
+			const {
+				rows: [stats],
+			} = await this.pool.query(`
+                WITH recent_analytics AS (
+                    SELECT DISTINCT ON (gift_id)
+                        gift_id,
+                        purchase_rate,
+                        trend,
+                        total_purchases
+                    FROM gift_analytics
+                    WHERE last_updated >= NOW() - INTERVAL '24 hours'
+                    ORDER BY gift_id, last_updated DESC
+                )
+                SELECT 
+                    COUNT(DISTINCT g.telegram_id) as total_gifts,
+                    SUM(CASE WHEN g.status = 'active' THEN 1 ELSE 0 END) as active_gifts,
+                    SUM(CASE WHEN g.status = 'sold_out' THEN 1 ELSE 0 END) as sold_out_gifts,
+                    COALESCE(AVG(NULLIF(ra.purchase_rate, 0)), 0) as avg_purchase_rate,
+                    COALESCE(MAX(ra.total_purchases), 0) as max_purchases_24h,
+                    COALESCE(SUM(ra.total_purchases), 0) as total_purchases_24h
+                FROM gifts g
+                LEFT JOIN recent_analytics ra ON g.telegram_id = ra.gift_id`);
 
-		model.compile({
-			optimizer: tf.train.adam(0.001),
-			loss: "meanSquaredError",
-		});
+			const { rows: trends } = await this.pool.query(`
+                WITH recent_analytics AS (
+                    SELECT DISTINCT ON (gift_id)
+                        gift_id,
+                        trend
+                    FROM gift_analytics
+                    WHERE last_updated >= NOW() - INTERVAL '24 hours'
+                    ORDER BY gift_id, last_updated DESC
+                )
+                SELECT trend, COUNT(*) as count
+                FROM recent_analytics
+                WHERE trend IS NOT NULL
+                GROUP BY trend`);
 
-		const weights = weightsData.map((w) => tf.tensor(w.data, w.shape));
-		model.setWeights(weights);
-
-		return model;
+			return {
+				...stats,
+				trends: trends.reduce(
+					(acc, { trend, count }) => ({
+						...acc,
+						[trend]: parseInt(count),
+					}),
+					{ increasing: 0, decreasing: 0, stable: 0 }
+				),
+			};
+		} catch (error) {
+			console.error("Error getting global stats:", error);
+			throw error;
+		}
 	}
 
-	private normalizeData(
-		timestamps: number[],
-		counts: number[],
-		changes: number[]
-	) {
-		const inputData = timestamps.map((t, i) => [t, counts[i], changes[i]]);
-
-		const inputTensor = tf.tensor2d(inputData);
-		const outputTensor = tf.tensor2d(counts, [counts.length, 1]);
-
-		const normalizedInputs = tf.tidy(() => {
-			const inputMin = inputTensor.min(0);
-			const inputMax = inputTensor.max(0);
-			return inputTensor.sub(inputMin).div(inputMax.sub(inputMin).add(1e-8));
-		});
-
-		const normalizedOutputs = tf.tidy(() => {
-			const outputMin = outputTensor.min();
-			const outputMax = outputTensor.max();
-			return outputTensor
-				.sub(outputMin)
-				.div(outputMax.sub(outputMin).add(1e-8));
-		});
-
-		return {
-			inputs: normalizedInputs,
-			outputs: normalizedOutputs,
-		};
+	public async cleanup() {
+		try {
+			await this.pool.query(`
+                DELETE FROM gift_predictions
+                WHERE created_at < NOW() - INTERVAL '7 days'
+            `);
+		} catch (error) {
+			console.error("Error during cleanup:", error);
+		}
 	}
 }

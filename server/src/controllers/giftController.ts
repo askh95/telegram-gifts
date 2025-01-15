@@ -301,133 +301,139 @@ export class GiftController {
 		try {
 			const giftId = req.params.id;
 
-			const [
-				{
-					rows: [gift],
-				},
-				prediction,
-			] = await Promise.all([
-				this.pool.query<GiftWithFormattedDate>(
-					`
-              SELECT 
-                *,
-                to_char(last_updated AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00"') as formatted_last_updated
-              FROM gifts 
-              WHERE telegram_id = $1
+			const {
+				rows: [result],
+			} = await this.pool.query(
+				`
+                WITH gift_data AS (
+                    SELECT 
+                        g.*,
+                        to_char(g.last_updated AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00"') as formatted_last_updated
+                    FROM gifts g 
+                    WHERE g.telegram_id = $1
+                ),
+                hourly_stats AS (
+                    SELECT 
+                        date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC') as hour,
+                        COALESCE(SUM(gh.change_amount), 0)::INTEGER as purchase_count
+                    FROM gifts_history gh
+                    WHERE 
+                        gh.telegram_id = $1 
+                        AND gh.last_updated >= NOW() AT TIME ZONE 'UTC' - interval '24 hours'
+                    GROUP BY date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC')
+                ),
+                latest_prediction AS (
+                    SELECT 
+                        predicted_sold_out_date,
+                        confidence,
+                        prediction_data,
+                        created_at
+                    FROM gift_predictions
+                    WHERE gift_id = $1
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ),
+                purchase_stats AS (
+                    SELECT 
+                        MIN(last_updated) as first_update,
+                        COALESCE(SUM(CASE 
+                            WHEN last_updated >= NOW() - interval '24 hours' 
+                            THEN change_amount 
+                            ELSE 0 
+                        END), 0)::INTEGER as purchases_24h
+                    FROM gifts_history
+                    WHERE telegram_id = $1 AND change_amount > 0
+                )
+                SELECT 
+                    g.*,
+                    p.*,
+                    lp.predicted_sold_out_date,
+                    lp.confidence,
+                    lp.prediction_data,
+                    lp.created_at as prediction_created_at,
+                    json_agg(
+                        json_build_object(
+                            'hour', to_char(h.hour AT TIME ZONE 'UTC', 'HH24:00'),
+                            'count', h.purchase_count
+                        ) ORDER BY h.hour
+                    ) as hourly_data
+                FROM gift_data g
+                CROSS JOIN purchase_stats p
+                LEFT JOIN latest_prediction lp ON true
+                LEFT JOIN hourly_stats h ON true
+                GROUP BY 
+                    g.telegram_id, g.custom_emoji_id, g.emoji, g.file_id, 
+                    g.file_size, g.file_unique_id, g.height, g.width,
+                    g.is_animated, g.is_video, g.star_count, g.remaining_count,
+                    g.total_count, g.status, g.thumbnail_file_id, 
+                    g.thumbnail_file_unique_id, g.thumbnail_file_size,
+                    g.thumbnail_width, g.thumbnail_height, g.thumb_file_id,
+                    g.thumb_file_unique_id, g.thumb_file_size, g.thumb_width,
+                    g.thumb_height, g.last_updated, g.formatted_last_updated,
+                    p.first_update, p.purchases_24h, lp.predicted_sold_out_date,
+                    lp.confidence, lp.prediction_data, lp.created_at
             `,
-					[giftId]
-				),
-				this.analyticsService.getLatestPrediction(giftId),
-			]);
+				[giftId]
+			);
 
-			if (!gift) {
+			if (!result) {
 				return res.status(404).json({ error: "Gift not found" });
 			}
 
-			const { rows: hourlyStats } = await this.pool.query(
-				`
-            WITH time_slots AS (
-              SELECT 
-                generate_series(
-                  date_trunc('hour', NOW() AT TIME ZONE 'UTC' - interval '24 hours'),
-                  date_trunc('hour', NOW() AT TIME ZONE 'UTC'),
-                  interval '1 hour'
-                ) AS hour
-            ),
-            hourly_purchases AS (
-              SELECT 
-                date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC') as hour,
-                COALESCE(SUM(gh.change_amount), 0)::INTEGER as purchase_count
-              FROM gifts_history gh
-              WHERE 
-                gh.telegram_id = $1 
-                AND gh.last_updated >= NOW() AT TIME ZONE 'UTC' - interval '24 hours'
-              GROUP BY date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC')
-            )
-            SELECT 
-              to_char(ts.hour AT TIME ZONE 'UTC', 'HH24:00') as hour,
-              COALESCE(hp.purchase_count, 0) as count
-            FROM time_slots ts
-            LEFT JOIN hourly_purchases hp ON ts.hour = hp.hour
-            ORDER BY ts.hour
-          `,
-				[giftId]
+			const hourlyStats = result.hourly_data.filter(
+				(stat: any) => stat.count > 0
 			);
-
-			const {
-				rows: [purchaseStats],
-			} = await this.pool.query(
-				`
-            SELECT 
-              MIN(last_updated) as first_update,
-              COALESCE(SUM(CASE 
-                WHEN last_updated >= NOW() - interval '24 hours' 
-                THEN change_amount 
-                ELSE 0 
-              END), 0)::INTEGER as purchases_24h
-            FROM gifts_history
-            WHERE telegram_id = $1 AND change_amount > 0
-          `,
-				[giftId]
-			);
-
-			let peakHourData = { hour: "00:00", count: 0 };
+			let peakHour = { hour: "00:00", count: 0 };
 			for (const stat of hourlyStats) {
-				if (stat.count > peakHourData.count) {
-					peakHourData = stat;
+				if (stat.count > peakHour.count) {
+					peakHour = stat;
 				}
 			}
 
 			const total24hPurchases = hourlyStats.reduce(
-				(sum, stat) => sum + stat.count,
+				(sum: number, stat: any) => sum + stat.count,
 				0
 			);
 
 			const hoursToCount = Math.min(
 				24,
-				Math.max(1, moment().diff(moment(purchaseStats.first_update), "hours"))
+				Math.max(1, moment().diff(moment(result.first_update), "hours"))
 			);
-			const currentRate = Math.round(
-				purchaseStats.purchases_24h / hoursToCount
-			);
-
-			const hourlyStatsFiltered = hourlyStats
-				.filter((stat) => stat.count > 0)
-				.map((stat) => ({
-					hour: stat.hour,
-					count: stat.count,
-				}));
+			const currentRate = Math.round(result.purchases_24h / hoursToCount);
 
 			const response = {
 				gift_id: giftId,
-				current_count: gift.remaining_count,
-				total_count: gift.total_count,
-				status: gift.status,
+				current_count: result.remaining_count,
+				total_count: result.total_count,
+				status: result.status,
 				analytics: {
 					peak_hour: {
-						hour: peakHourData.hour,
-						count: peakHourData.count,
+						hour: peakHour.hour,
+						count: peakHour.count,
 					},
 					purchase_rate: currentRate,
-					prediction: prediction
+					prediction: result.predicted_sold_out_date
 						? {
-								remaining: gift.remaining_count,
-								predicted_sold_out: prediction.predicted_sold_out_date,
-								confidence: prediction.confidence,
+								remaining: result.remaining_count,
+								predicted_sold_out: result.predicted_sold_out_date,
+								confidence: result.confidence,
 								avg_hourly_rate: Math.round(total24hPurchases / 24),
 								total_purchases_24h: total24hPurchases,
 						  }
 						: null,
-					hourly_stats: hourlyStatsFiltered,
+					hourly_stats: hourlyStats,
 				},
-				last_updated: gift.formatted_last_updated,
+				last_updated: result.formatted_last_updated,
 			};
 
 			res.json(response);
 
+			// Асинхронно обновляем прогноз если нужно
 			if (
-				!prediction?.created_at ||
-				moment(prediction.created_at).isBefore(moment().subtract(30, "minutes"))
+				!result.prediction_created_at ||
+				moment(result.prediction_created_at).isBefore(
+					moment().subtract(30, "minutes")
+				)
 			) {
 				this.analyticsService.updatePrediction(giftId).catch(console.error);
 			}
