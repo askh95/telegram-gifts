@@ -3,6 +3,7 @@ import { Star, Clock } from "lucide-react";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useUserTimezone } from "../hooks/useUserTimezone";
+import { useGetGiftThumbnailQuery } from "../store/api/gifts";
 
 interface GiftCardProps {
 	gift: Gift;
@@ -11,6 +12,8 @@ interface GiftCardProps {
 
 export const GiftCard = ({ gift, onClick }: GiftCardProps) => {
 	const { offset } = useUserTimezone();
+
+	const { data: thumbnailUrl } = useGetGiftThumbnailQuery(gift.telegram_id);
 
 	const percentComplete =
 		((gift.total_count - gift.remaining_count) / gift.total_count) * 100;
@@ -34,7 +37,24 @@ export const GiftCard = ({ gift, onClick }: GiftCardProps) => {
 			<div className="flex flex-col sm:flex-row items-center gap-3 md:gap-4">
 				<div className="relative w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0">
 					<div className="w-full h-full flex items-center justify-center bg-gray-700/50 rounded-lg">
-						<span className="text-5xl sm:text-6xl">{gift.emoji}</span>
+						{thumbnailUrl ? (
+							<img
+								src={thumbnailUrl}
+								alt={gift.emoji}
+								className="w-full h-full object-contain"
+								onError={(e) => {
+									const target = e.target as HTMLImageElement;
+									target.onerror = null;
+									target.className = "hidden";
+									target.parentElement?.insertAdjacentHTML(
+										"beforeend",
+										`<span class="text-5xl sm:text-6xl">${gift.emoji}</span>`
+									);
+								}}
+							/>
+						) : (
+							<span className="text-5xl sm:text-6xl">{gift.emoji}</span>
+						)}
 					</div>
 
 					<div

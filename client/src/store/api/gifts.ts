@@ -39,6 +39,16 @@ export const giftsApi = createApi({
 			query: ({ id, limit = 15 }) => `/gifts/${id}/history?limit=${limit}`,
 			transformResponse: (response: { data: GiftHistory[] }) => response.data,
 		}),
+
+		getGiftThumbnail: builder.query<string, string>({
+			query: (id) => ({
+				url: `/gifts/${id}/thumbnail`,
+				responseHandler: async (response) => {
+					const blob = await response.blob();
+					return URL.createObjectURL(blob);
+				},
+			}),
+		}),
 	}),
 });
 
@@ -47,4 +57,5 @@ export const {
 	useGetGiftByIdQuery,
 	useGetGiftStatsQuery,
 	useGetGiftHistoryQuery,
+	useGetGiftThumbnailQuery,
 } = giftsApi;

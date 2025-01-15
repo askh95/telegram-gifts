@@ -1,9 +1,12 @@
 import { Request, Response } from "express";
 import { Pool } from "pg";
-import { fetchGifts } from "../services/telegramService";
+import { fetchGifts, getGiftSticker } from "../services/telegramService";
 import { Gift, TelegramGiftResponse } from "../models/Gift";
 import { AnalyticsService } from "../services/analyticsService";
 import moment from "moment";
+import { ConverterService } from "../services/converterService";
+import axios from "axios";
+import sharp from "sharp";
 
 interface HistoryRecord {
 	remaining_count: number;
@@ -428,7 +431,6 @@ export class GiftController {
 
 			res.json(response);
 
-			// Асинхронно обновляем прогноз если нужно
 			if (
 				!result.prediction_created_at ||
 				moment(result.prediction_created_at).isBefore(
@@ -536,6 +538,61 @@ export class GiftController {
 		} catch (error) {
 			console.error("Error fetching gift history:", error);
 			res.status(500).json({ error: "Failed to fetch gift history" });
+		}
+	}
+
+	async getGiftStickerThumbnail(req: Request, res: Response) {
+		try {
+			const { rows } = await this.pool.query<Gift>(
+				`SELECT 
+                    thumbnail_file_id, 
+                    thumb_file_id, 
+                    width, 
+                    height 
+                FROM gifts 
+                WHERE telegram_id = $1`,
+				[req.params.id]
+			);
+
+			if (rows.length === 0) {
+				return res.status(404).json({ error: "Gift not found" });
+			}
+
+			const gift = rows[0];
+			const fileId = gift.thumbnail_file_id || gift.thumb_file_id;
+
+			if (!fileId) {
+				return res.status(404).json({ error: "No thumbnail available" });
+			}
+
+			const thumbnailUrl = await getGiftSticker(fileId);
+			const response = await axios.get(thumbnailUrl, {
+				responseType: "arraybuffer",
+			});
+
+			const processedImage = await sharp(Buffer.from(response.data))
+				.resize(512, 512, {
+					fit: "contain",
+					background: { r: 255, g: 255, b: 255, alpha: 0 },
+				})
+				.sharpen({
+					sigma: 1,
+					m1: 0,
+					m2: 3,
+				})
+				.png({
+					quality: 100,
+					compressionLevel: 9,
+					palette: true,
+				})
+				.toBuffer();
+
+			res.set("Content-Type", "image/png");
+			res.set("Cache-Control", "public, max-age=31536000");
+			res.send(processedImage);
+		} catch (error) {
+			console.error("Error fetching sticker thumbnail:", error);
+			res.status(500).json({ error: "Failed to fetch thumbnail" });
 		}
 	}
 }

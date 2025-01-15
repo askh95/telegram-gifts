@@ -20,5 +20,9 @@ export function createGiftRouter(controller: GiftController): Router {
 		controller.getGiftHistory(req, res);
 	});
 
+	router.get("/:id/thumbnail", (req: Request, res: Response) => {
+		controller.getGiftStickerThumbnail(req, res);
+	});
+
 	return router;
 }

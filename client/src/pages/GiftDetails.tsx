@@ -12,6 +12,7 @@ import {
 	useGetGiftByIdQuery,
 	useGetGiftStatsQuery,
 	useGetGiftHistoryQuery,
+	useGetGiftThumbnailQuery,
 } from "../store/api/gifts";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import dayjs from "dayjs";
@@ -73,7 +74,7 @@ export const GiftDetails = () => {
 
 	const { data: gift, refetch: refetchGift } = useGetGiftByIdQuery(id);
 	const { data: stats, refetch: refetchStats } = useGetGiftStatsQuery(id);
-
+	const { data: thumbnailUrl } = useGetGiftThumbnailQuery(id);
 	const { data: history, refetch: refetchHistory } = useGetGiftHistoryQuery({
 		id,
 		limit: 15,
@@ -155,7 +156,22 @@ export const GiftDetails = () => {
 					<div className="flex flex-col sm:flex-row items-center gap-6">
 						<div className="relative w-32 h-32 flex-shrink-0">
 							<div className="w-full h-full flex items-center justify-center bg-gray-700/50 rounded-lg">
-								<span className="text-7xl">{gift.emoji}</span>
+								<div className="w-full h-full flex items-center justify-center bg-gray-700/50 rounded-lg overflow-hidden">
+									<img
+										src={thumbnailUrl}
+										alt={gift.emoji}
+										className="w-full h-full object-contain transform transition-transform duration-200 hover:scale-110"
+										onError={(e) => {
+											const target = e.target as HTMLImageElement;
+											target.onerror = null;
+											target.className = "hidden";
+											target.parentElement?.insertAdjacentHTML(
+												"beforeend",
+												`<span class="text-7xl">${gift.emoji}</span>`
+											);
+										}}
+									/>
+								</div>
 							</div>
 							<div className="absolute top-2 right-2 bg-blue-500/80 backdrop-blur-sm text-white text-sm font-bold px-3 py-1 rounded-full">
 								{gift.star_count} ⭐
