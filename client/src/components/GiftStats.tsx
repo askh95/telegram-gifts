@@ -6,7 +6,9 @@ import {
 	AreaChart,
 	Area,
 	CartesianGrid,
+	TooltipProps,
 } from "recharts";
+import { useUserTimezone } from "../hooks/useUserTimezone";
 
 interface HourlyStat {
 	hour: string;
@@ -17,48 +19,93 @@ interface GiftStatsProps {
 	hourlyStats: HourlyStat[];
 }
 
-interface TooltipProps {
-	active?: boolean;
-	payload?: Array<{
-		name: string;
-		value: number;
-	}>;
-	label?: string;
+interface DataPoint {
+	hour: string;
+	purchases: number;
 }
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
-	if (active && payload && payload.length) {
-		return (
-			<div className="bg-gray-800 p-3 rounded-lg border border-gray-700 shadow-lg">
-				<p className="text-gray-300 text-sm mb-1">{label}</p>
-				<p className="text-white font-medium">
-					{payload[0].name}: {payload[0].value.toLocaleString()}
-				</p>
-			</div>
-		);
-	}
-	return null;
+interface CustomTooltipData {
+	name: string;
+	value: number;
+	payload: DataPoint;
+}
+
+const CustomTooltip = ({
+	active,
+	payload,
+	label,
+	currentDataSet,
+}: TooltipProps<number, string> & {
+	currentDataSet?: DataPoint[];
+}) => {
+	if (!active || !currentDataSet?.length) return null;
+
+	const data = payload?.[0] as CustomTooltipData | undefined;
+	if (!data?.name || !data?.value) return null;
+
+	const lastPoint = currentDataSet[currentDataSet.length - 1];
+	const isLastPoint = label === lastPoint.hour;
+
+	return (
+		<div className="bg-gray-800 p-3 rounded-lg border border-gray-700 shadow-lg">
+			<p className="text-gray-300 text-sm mb-1">
+				{label}
+				{isLastPoint && (
+					<span className="text-gray-400 ml-2">- {getCurrentTime()}</span>
+				)}
+			</p>
+			<p className="text-white font-medium">
+				{data.name}: {data.value.toLocaleString()}
+			</p>
+		</div>
+	);
+};
+
+const getCurrentTime = () => {
+	const now = new Date();
+	return `${String(now.getHours()).padStart(2, "0")}:${String(
+		now.getMinutes()
+	).padStart(2, "0")}`;
 };
 
 export const GiftStats = ({ hourlyStats }: GiftStatsProps) => {
-	const formattedData = hourlyStats.map((stat) => {
-		const hour = parseInt(stat.hour);
+	const { offset } = useUserTimezone();
+
+	const lastHours = new Map<number, HourlyStat>();
+	[...hourlyStats].reverse().forEach((stat) => {
+		const hourNum = parseInt(stat.hour);
+		if (!lastHours.has(hourNum)) {
+			lastHours.set(hourNum, stat);
+		}
+	});
+
+	const formattedData = Array.from(lastHours.values()).map((stat) => {
+		let hour = parseInt(stat.hour);
+
+		hour = (hour + offset) % 24;
+		if (hour < 0) hour += 24;
+
+		const formattedHour = hour.toString().padStart(2, "0");
 
 		return {
-			hour: `${hour.toString().padStart(2, "0")}:00`,
+			hour: `${formattedHour}:00`,
 			purchases: stat.count,
 		};
+	});
+
+	const sortedData = [...formattedData].sort((a, b) => {
+		return parseInt(a.hour) - parseInt(b.hour);
 	});
 
 	return (
 		<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-4 sm:p-6 shadow-lg border border-gray-700/50">
 			<h3 className="text-base sm:text-lg font-bold text-white mb-2 sm:mb-4">
-				Почасовые покупки <u>UTC +0</u>
+				Почасовые покупки
 			</h3>
 			<div className="h-[200px] sm:h-[250px] md:h-[300px]">
 				<ResponsiveContainer width="100%" height="100%">
 					<AreaChart
-						data={formattedData}
+						data={sortedData}
 						margin={{
 							top: 5,
 							right: 10,
@@ -90,7 +137,11 @@ export const GiftStats = ({ hourlyStats }: GiftStatsProps) => {
 							axisLine={false}
 							tickLine={false}
 						/>
-						<Tooltip content={<CustomTooltip />} />
+						<Tooltip<number, string>
+							content={(props) => (
+								<CustomTooltip {...props} currentDataSet={sortedData} />
+							)}
+						/>
 						<Area
 							type="monotone"
 							dataKey="purchases"
