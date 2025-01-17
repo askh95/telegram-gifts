@@ -71,30 +71,12 @@ const getCurrentTime = () => {
 export const GiftStats = ({ hourlyStats }: GiftStatsProps) => {
 	const { offset } = useUserTimezone();
 
-	const lastHours = new Map<number, HourlyStat>();
-	[...hourlyStats].reverse().forEach((stat) => {
-		const hourNum = parseInt(stat.hour);
-		if (!lastHours.has(hourNum)) {
-			lastHours.set(hourNum, stat);
-		}
-	});
-
-	const formattedData = Array.from(lastHours.values()).map((stat) => {
-		let hour = parseInt(stat.hour);
-
-		hour = (hour + offset) % 24;
-		if (hour < 0) hour += 24;
-
-		const formattedHour = hour.toString().padStart(2, "0");
-
+	const formattedData = hourlyStats.map((stat) => {
+		const hour = (parseInt(stat.hour) + offset + 24) % 24;
 		return {
-			hour: `${formattedHour}:00`,
+			hour: `${hour.toString().padStart(2, "0")}:00`,
 			purchases: stat.count,
 		};
-	});
-
-	const sortedData = [...formattedData].sort((a, b) => {
-		return parseInt(a.hour) - parseInt(b.hour);
 	});
 
 	return (
@@ -105,7 +87,7 @@ export const GiftStats = ({ hourlyStats }: GiftStatsProps) => {
 			<div className="h-[200px] sm:h-[250px] md:h-[300px]">
 				<ResponsiveContainer width="100%" height="100%">
 					<AreaChart
-						data={sortedData}
+						data={formattedData}
 						margin={{
 							top: 5,
 							right: 10,
@@ -139,7 +121,7 @@ export const GiftStats = ({ hourlyStats }: GiftStatsProps) => {
 						/>
 						<Tooltip<number, string>
 							content={(props) => (
-								<CustomTooltip {...props} currentDataSet={sortedData} />
+								<CustomTooltip {...props} currentDataSet={formattedData} />
 							)}
 						/>
 						<Area
