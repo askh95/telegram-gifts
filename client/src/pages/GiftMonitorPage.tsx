@@ -47,7 +47,7 @@ export const GiftMonitorPage = () => {
 	}, [currentGiftName]);
 
 	const { status } = useWebSocket({
-		url: "ws://localhost:3003/api/rust/ws",
+		url: import.meta.env.VITE_RUST_WS,
 		onMessage: handleWebSocketMessage,
 		currentGiftName,
 	});
