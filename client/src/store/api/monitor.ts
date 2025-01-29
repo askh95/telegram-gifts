@@ -11,7 +11,7 @@ interface StartMonitoringResponse {
 
 export const monitorApi = createApi({
 	reducerPath: "monitorApi",
-	baseQuery: fetchBaseQuery({ baseUrl: "http://localhost:3003" }),
+	baseQuery: fetchBaseQuery({ baseUrl: "http://localhost:3003/api/rust" }),
 	endpoints: (builder) => ({
 		startMonitoring: builder.mutation<
 			StartMonitoringResponse,

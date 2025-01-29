@@ -37,8 +37,10 @@ async fn main() {
     });
 
     let app = Router::new()
-        .route("/check", post(start_monitoring))
-        .route("/ws", get(handle_ws_connection))
+        .nest("/api/rust", Router::new()
+            .route("/check", post(start_monitoring))
+            .route("/ws", get(handle_ws_connection))
+        )
         .layer(CorsLayer::permissive())
         .with_state(state);
 

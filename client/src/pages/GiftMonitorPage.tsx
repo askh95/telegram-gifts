@@ -47,7 +47,7 @@ export const GiftMonitorPage = () => {
 	}, [currentGiftName]);
 
 	const { status } = useWebSocket({
-		url: "ws://localhost:3003/ws",
+		url: "ws://localhost:3003/api/rust/ws",
 		onMessage: handleWebSocketMessage,
 		currentGiftName,
 	});
