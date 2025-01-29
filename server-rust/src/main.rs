@@ -23,7 +23,6 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() {
-    // Инициализация логирования
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
         .init();
@@ -43,7 +42,7 @@ async fn main() {
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3003));
     println!("Server running on http://{}", addr);
 
     axum::serve(
