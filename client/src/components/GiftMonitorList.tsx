@@ -44,8 +44,26 @@ export const GiftMonitorList = ({ updates }: GiftMonitorListProps) => {
 					<div
 						key={`${update.currentId}-${index}`}
 						className="bg-gray-700/30 rounded-lg p-4 border border-gray-600/30 
-                   flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
+            flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
+						style={{
+							opacity: 0,
+							transform: "translateY(10px)",
+							animation: "0.5s ease-out forwards",
+							animationName: "fadeIn",
+							animationDelay: `${index * 0.1}s`,
+						}}
 					>
+						<style>
+							{`
+            @keyframes fadeIn {
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            `}
+						</style>
+
 						<span className="text-gray-400 text-sm">{update.timestamp}</span>
 						<a
 							href={getTelegramLink(update.giftName, update.currentId)}

@@ -35,7 +35,7 @@ export const GiftMonitorPage = () => {
 						timestamp: new Date().toLocaleTimeString(),
 						found: true,
 					},
-					...prev.slice(0, 49),
+					...prev.slice(0, 29),
 				]);
 			}
 		},
@@ -90,7 +90,16 @@ export const GiftMonitorPage = () => {
 		}
 	};
 
-	const giftExamples = ["WitchHat", "PartySparkler", "HomemadeCake"];
+	const giftExamples = [
+		"Mittens",
+		"HangingStar",
+		"LoveCandle",
+		"DeskCalendar",
+		"Snow",
+		"JingleBells",
+		"CookieHeart",
+		"... и другие подарки из NFT-коллекции",
+	];
 
 	return (
 		<div className="min-h-screen bg-gray-900 text-white p-6">
@@ -98,7 +107,11 @@ export const GiftMonitorPage = () => {
 				<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50">
 					<h1 className="text-2xl font-bold mb-6">Мониторинг подарков</h1>
 
-					<GiftMonitorStatus status={status} lastMaxId={lastMaxId} />
+					<GiftMonitorStatus
+						status={status}
+						lastMaxId={lastMaxId}
+						currentGiftName={currentGiftName}
+					/>
 
 					<GiftMonitorInput onSubmit={handleStartMonitoring} error={error} />
 				</div>
@@ -119,9 +132,6 @@ export const GiftMonitorPage = () => {
 								{gift}
 							</div>
 						))}
-						<div className="bg-gray-700/40 px-4 py-2 rounded-lg font-mono text-green-400">
-							... и другие подарки из NFT-коллекции
-						</div>
 					</div>
 				</div>
 				<GiftMonitorList updates={updates} />
