@@ -94,6 +94,16 @@ export const Navbar = () => {
 								<Gift className="h-5 w-5" />
 								Подарки
 							</NavLink>
+							<NavLink
+								to="/monitor"
+								className="flex items-center gap-2 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-blue-500"
+								style={({ isActive }) => ({
+									color: isActive ? "#3B82F6" : "",
+								})}
+							>
+								<Activity className="h-5 w-5" />
+								Мониторинг
+							</NavLink>
 							<a
 								href="https://t.me/giftsanalyz"
 								target="_blank"
