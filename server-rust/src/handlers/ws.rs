@@ -1,3 +1,4 @@
+// handlers/ws.rs
 use axum::{
     extract::{State, WebSocketUpgrade, ws::{Message, WebSocket}},
     response::Response,
@@ -6,6 +7,7 @@ use futures::{StreamExt, SinkExt};
 use std::sync::Arc;
 use crate::AppState;
 use tracing::{info, error};
+use tokio::task::JoinHandle;  
 
 pub async fn handle_ws_connection(
     ws: WebSocketUpgrade,
@@ -17,21 +19,29 @@ pub async fn handle_ws_connection(
 
 async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     let (mut sender, mut receiver) = socket.split();
-    
     info!("WebSocket connection established");
-    
-    if let Some(Ok(message)) = receiver.next().await {
+
+    let mut current_task: Option<JoinHandle<()>> = None;
+
+    while let Some(Ok(message)) = receiver.next().await {
         if let Message::Text(gift_name) = message {
             info!("Received gift name: {}", gift_name);
-            
+
+            if let Some(handle) = current_task {
+                handle.abort();
+            }
+
             let gift_name_clone = gift_name.clone();
             let checker = state.checker.clone();
-            tokio::spawn(async move {
+            
+            let handle = tokio::spawn(async move {
                 checker.monitor_gift(&gift_name_clone).await;
             });
+            
+            current_task = Some(handle);
 
             let mut rx = state.tx.subscribe();
-            
+
             while let Ok(status) = rx.recv().await {
                 if status.gift_name == gift_name {
                     match serde_json::to_string(&status) {
@@ -50,4 +60,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     }
 
     info!("WebSocket connection closed");
+    if let Some(handle) = current_task {
+        handle.abort();
+    }
 }
