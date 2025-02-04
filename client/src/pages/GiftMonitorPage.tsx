@@ -7,7 +7,6 @@ import {
 	useGetGiftNamesQuery,
 } from "../store/api/monitor";
 import { NFTCard } from "../components/NFTCard";
-import ActiveUsers from "../components/ActiveUsers";
 
 export type GiftUpdate = {
 	giftName: string;
@@ -98,10 +97,7 @@ export const GiftMonitorPage = () => {
 		<div className="min-h-screen bg-gray-900 text-white p-6">
 			<div className="max-w-7xl mx-auto space-y-6">
 				<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50">
-					<div className="flex justify-between gap-4 mb-6">
-						<h1 className="text-2xl font-bold">Мониторинг подарков</h1>
-						<ActiveUsers />
-					</div>
+					<h1 className="text-2xl font-bold mb-6">Мониторинг подарков</h1>
 					<GiftMonitorStatus
 						status={status}
 						lastMaxId={lastMaxId}
