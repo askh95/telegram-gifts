@@ -97,3 +97,13 @@ export interface CryptoAddress {
 }
 
 export type CopySuccessMessage = string;
+
+export interface Gift {
+	id: string;
+	name: string;
+	thumbnail?: string;
+}
+
+export interface GiftNameMapping {
+	[key: string]: string;
+}

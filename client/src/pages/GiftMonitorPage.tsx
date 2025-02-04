@@ -1,9 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { useWebSocket } from "../hooks/useWebSocket";
-import { GiftMonitorInput } from "../components/GiftMonitorInput";
 import { GiftMonitorStatus } from "../components/GiftMonitorStatus";
-import { GiftMonitorList } from "../components/GiftMonitorList";
-import { useStartMonitoringMutation } from "../store/api/monitor";
+// import { GiftMonitorList } from "../components/GiftMonitorList";
+import {
+	useStartMonitoringMutation,
+	useGetGiftNamesQuery,
+} from "../store/api/monitor";
+import { NFTCard } from "../components/NFTCard";
 
 export type GiftUpdate = {
 	giftName: string;
@@ -17,6 +20,7 @@ export const GiftMonitorPage = () => {
 	const [currentGiftName, setCurrentGiftName] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [startMonitoring] = useStartMonitoringMutation();
+	const { data: giftNames } = useGetGiftNamesQuery();
 
 	const lastMaxId = updates.reduce(
 		(max, update) => Math.max(max, update.currentId),
@@ -55,7 +59,6 @@ export const GiftMonitorPage = () => {
 	const handleStartMonitoring = async (giftName: string) => {
 		try {
 			setError(null);
-
 			const response = await startMonitoring({ gift_name: giftName }).unwrap();
 
 			if (response.status === "not_found") {
@@ -90,51 +93,47 @@ export const GiftMonitorPage = () => {
 		}
 	};
 
-	const giftExamples = [
-		"Mittens",
-		"HangingStar",
-		"LoveCandle",
-		"DeskCalendar",
-		"Snow",
-		"JingleBells",
-		"CookieHeart",
-		"... и другие подарки из NFT-коллекции",
-	];
-
 	return (
 		<div className="min-h-screen bg-gray-900 text-white p-6">
 			<div className="max-w-7xl mx-auto space-y-6">
 				<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50">
 					<h1 className="text-2xl font-bold mb-6">Мониторинг подарков</h1>
-
 					<GiftMonitorStatus
 						status={status}
 						lastMaxId={lastMaxId}
 						currentGiftName={currentGiftName}
 					/>
-
-					<GiftMonitorInput onSubmit={handleStartMonitoring} error={error} />
 				</div>
 
-				<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50 mt-6 mb-6">
-					<h2 className="text-xl font-semibold mb-4">Формат ввода подарков</h2>
-					<p className="text-gray-300 mb-4">
-						Введите название подарка точно как указано в списке ниже. Названия
-						чувствительны к регистру и должны быть написаны слитно, в формате
-						PascalCase.
+				<div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6">
+					<p className="text-yellow-200/90 text-sm">
+						Внимание: Если вы хотите начать мониторинг другого подарка,
+						пожалуйста, перезагрузите страницу. Смена подарка без перезагрузки
+						может привести к некорректной работе мониторинга.
 					</p>
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-						{giftExamples.map((gift) => (
-							<div
-								key={gift}
-								className="bg-gray-700/40 px-4 py-2 rounded-lg font-mono text-green-400"
-							>
-								{gift}
-							</div>
+				</div>
+
+				<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50">
+					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+						{Object.entries(giftNames || {}).map(([id, name]) => (
+							<NFTCard
+								key={id}
+								id={id}
+								name={name}
+								onSelect={handleStartMonitoring}
+								isSelected={currentGiftName === name.replace(/[^a-zA-Z]/g, "")}
+							/>
 						))}
 					</div>
 				</div>
-				<GiftMonitorList updates={updates} />
+
+				{error && (
+					<div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+						<p className="text-red-400">{error}</p>
+					</div>
+				)}
+
+				{/* <GiftMonitorList updates={updates} /> */}
 			</div>
 		</div>
 	);

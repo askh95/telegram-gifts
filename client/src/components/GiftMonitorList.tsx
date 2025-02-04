@@ -1,8 +1,7 @@
 import { Gift, ExternalLink } from "lucide-react";
-import type { GiftUpdate } from "../pages/GiftMonitorPage";
 
 interface GiftMonitorListProps {
-	updates: GiftUpdate[];
+	updates: any[];
 }
 
 export const GiftMonitorList = ({ updates }: GiftMonitorListProps) => {
