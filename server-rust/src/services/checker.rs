@@ -16,7 +16,7 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_RETRIES: u32 = 5;
 const RETRY_DELAY: Duration = Duration::from_secs(2);
 const DEFAULT_START_ID: u32 = 1;
-const CLEANUP_INTERVAL: u64 = 10 * 60; 
+const CLEANUP_INTERVAL: u64 = 5 * 60; 
 
 pub struct GiftChecker {
     client: Client,
@@ -135,7 +135,7 @@ impl GiftChecker {
         ));
     
         let found_ids = self.found_ids.clone();
-        let batch_size: u32 = 50;
+        let batch_size: u32 = 100;
     
         loop {
             let mut tasks = Vec::with_capacity(batch_size as usize);
@@ -184,7 +184,7 @@ impl GiftChecker {
             }
     
             join_all(tasks).await;
-            tokio::time::sleep(Duration::from_millis(200)).await;
+            tokio::time::sleep(Duration::from_millis(20)).await;
         }
     }
 
