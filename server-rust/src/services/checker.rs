@@ -60,7 +60,7 @@ impl GiftChecker {
         });
     }
 
-    async fn get_current_gift_count(&self, gift_name: &str) -> Result<u32, AppError> {
+    pub async fn get_current_gift_count(&self, gift_name: &str) -> Result<u32, AppError> {
         for attempt in 1..=MAX_RETRIES {
             info!("Attempting to get gift count, attempt #{}", attempt);
             

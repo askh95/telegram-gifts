@@ -5,6 +5,7 @@ use axum::{
 use futures::{StreamExt, SinkExt};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use crate::models::gift::GiftStatus; 
 use crate::AppState;
 use tracing::{info, error};
 use tokio::task::JoinHandle;
@@ -46,6 +47,19 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                         last_activity = Instant::now();
                         match msg {
                             Message::Text(gift_name) => {
+                                // Получаем и отправляем начальное количество
+                                if let Ok(count) = state.checker.get_current_gift_count(&gift_name).await {
+                                    let initial_status = GiftStatus {
+                                        gift_name: gift_name.clone(),
+                                        current_id: count,
+                                        found: true,
+                                    };
+                                    
+                                    if let Ok(msg) = serde_json::to_string(&initial_status) {
+                                        let _ = sender.send(Message::Text(msg)).await;
+                                    }
+                                }
+
                                 if let Some(handle) = current_task.take() {
                                     handle.abort();
                                 }
