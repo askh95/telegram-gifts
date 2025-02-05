@@ -1,13 +1,13 @@
-// handlers/ws.rs
 use axum::{
     extract::{State, WebSocketUpgrade, ws::{Message, WebSocket}},
     response::Response,
 };
 use futures::{StreamExt, SinkExt};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use crate::AppState;
 use tracing::{info, error};
-use tokio::task::JoinHandle;  
+use tokio::task::JoinHandle;
 
 pub async fn handle_ws_connection(
     ws: WebSocketUpgrade,
@@ -22,45 +22,72 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     info!("WebSocket connection established");
 
     let mut current_task: Option<JoinHandle<()>> = None;
+    let mut last_activity = Instant::now();
+    const WS_TIMEOUT: Duration = Duration::from_secs(150);
 
-    while let Some(Ok(message)) = receiver.next().await {
-        if let Message::Text(gift_name) = message {
-            info!("Received gift name: {}", gift_name);
+    let ping_interval = tokio::time::interval(Duration::from_secs(30));
+    tokio::pin!(ping_interval);
 
-            if let Some(handle) = current_task {
-                handle.abort();
+    loop {
+        tokio::select! {
+            _ = ping_interval.tick() => {
+                if last_activity.elapsed() > WS_TIMEOUT {
+                    break;
+                }
+                
+                if let Err(_) = sender.send(Message::Ping(vec![])).await {
+                    break;
+                }
             }
 
-            let gift_name_clone = gift_name.clone();
-            let checker = state.checker.clone();
-            
-            let handle = tokio::spawn(async move {
-                checker.monitor_gift(&gift_name_clone).await;
-            });
-            
-            current_task = Some(handle);
+            message = receiver.next() => {
+                match message {
+                    Some(Ok(msg)) => {
+                        last_activity = Instant::now();
+                        match msg {
+                            Message::Text(gift_name) => {
+                                if let Some(handle) = current_task.take() {
+                                    handle.abort();
+                                }
 
-            let mut rx = state.tx.subscribe();
+                                let gift_name_clone = gift_name.clone();
+                                let checker = state.checker.clone();
+                                let handle = tokio::spawn(async move {
+                                    checker.monitor_gift(&gift_name_clone).await;
+                                });
+                                current_task = Some(handle);
 
-            while let Ok(status) = rx.recv().await {
-                if status.gift_name == gift_name {
-                    match serde_json::to_string(&status) {
-                        Ok(msg) => {
-                            info!("Sending status message: {}", msg);
-                            if let Err(e) = sender.send(Message::Text(msg)).await {
-                                error!("Failed to send message: {}", e);
-                                break;
+                                let mut rx = state.tx.subscribe();
+                                while let Ok(status) = rx.recv().await {
+                                    if status.gift_name == gift_name {
+                                        match serde_json::to_string(&status) {
+                                            Ok(msg) => {
+                                                if let Err(_) = sender.send(Message::Text(msg)).await {
+                                                    break;
+                                                }
+                                            }
+                                            Err(e) => error!("Serialize error: {}", e),
+                                        }
+                                    }
+                                }
                             }
+                            Message::Pong(_) => last_activity = Instant::now(),
+                            Message::Close(_) => break,
+                            _ => {}
                         }
-                        Err(e) => error!("Failed to serialize status: {}", e),
                     }
+                    Some(Err(e)) => {
+                        error!("WebSocket error: {}", e);
+                        break;
+                    }
+                    None => break
                 }
             }
         }
     }
 
-    info!("WebSocket connection closed");
     if let Some(handle) = current_task {
         handle.abort();
     }
+    info!("WebSocket connection closed");
 }
