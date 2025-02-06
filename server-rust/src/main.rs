@@ -1,4 +1,3 @@
-// src/main.rs
 mod handlers;
 mod models;
 mod services;
@@ -11,7 +10,7 @@ use axum::{
 use handlers::monitor::start_monitoring;  
 use handlers::ws::handle_ws_connection;
 use services::checker::GiftChecker;
-use std::{sync::Arc, net::SocketAddr};
+use std::{sync::Arc, net::SocketAddr, time::Duration};
 use tokio::sync::broadcast;
 use tower_http::cors::CorsLayer;
 use tracing::Level;
@@ -23,6 +22,12 @@ pub struct AppState {
     tx: broadcast::Sender<GiftStatus>,
 }
 
+async fn restart_periodically() {
+    let restart_interval = Duration::from_secs(3600);
+    tokio::time::sleep(restart_interval).await;
+    std::process::exit(0);
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -30,13 +35,10 @@ async fn main() {
         .init();
 
     let (tx, _) = broadcast::channel::<GiftStatus>(100);
-
     let checker = Arc::new(GiftChecker::new(tx.clone()));
+    let state = Arc::new(AppState { checker, tx });
 
-    let state = Arc::new(AppState {
-        checker,
-        tx,
-    });
+    tokio::spawn(restart_periodically());
 
     let app = Router::new()
         .nest("/api/rust", Router::new()
