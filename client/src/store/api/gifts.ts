@@ -1,3 +1,4 @@
+// src/store/api/gifts.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type {
 	Gift,
@@ -29,8 +30,14 @@ export const giftsApi = createApi({
 		getGiftById: builder.query<GiftDetails, string>({
 			query: (id) => `/gifts/${id}`,
 		}),
-		getGiftStats: builder.query<GiftStats, string>({
-			query: (id) => `/gifts/${id}/stats`,
+		getGiftStats: builder.query<
+			GiftStats,
+			{ id: string; period?: "7d" | "30d" | "all" }
+		>({
+			query: ({ id, period }) => ({
+				url: `/gifts/${id}/stats`,
+				params: period ? { period } : undefined,
+			}),
 		}),
 		getGiftHistory: builder.query<
 			GiftHistory[],

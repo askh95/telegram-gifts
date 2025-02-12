@@ -1,3 +1,4 @@
+// src/types/gift.ts
 export interface Gift {
 	telegram_id: string;
 	custom_emoji_id: string;
@@ -32,8 +33,10 @@ export interface GiftStats {
 	current_count: number;
 	total_count: number;
 	status: string;
+	period: "24h" | "7d" | "30d" | "all";
 	analytics: {
 		peak_hour: {
+			date: string;
 			hour: string;
 			count: number;
 		};
@@ -47,6 +50,7 @@ export interface GiftStats {
 			total_purchases_24h: number;
 		};
 		hourly_stats: Array<{
+			date?: string;
 			hour: string;
 			count: number;
 		}>;

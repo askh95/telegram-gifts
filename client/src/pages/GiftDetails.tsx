@@ -20,11 +20,10 @@ import "dayjs/locale/ru";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import customParseFormat from "dayjs/plugin/customParseFormat";
-
 import { useUserTimezone } from "../hooks/useUserTimezone";
-
 import { GiftHistory } from "../components/GiftHistory";
 import { GiftStats } from "../components/GiftStats";
+import { useGetGiftNamesQuery } from "../store/api/monitor";
 
 interface AnimatedValueProps {
 	value: number;
@@ -68,17 +67,30 @@ const AnimatedValue = ({
 
 export const GiftDetails = () => {
 	const { offset } = useUserTimezone();
-
 	const { id = "" } = useParams();
 	const navigate = useNavigate();
 
+	const { data: initialStats } = useGetGiftStatsQuery({
+		id,
+		period: undefined,
+	});
+
+	const defaultPeriod = initialStats?.current_count === 0 ? "all" : "24h";
+	const [period, setPeriod] = useState<"24h" | "7d" | "30d" | "all">(
+		defaultPeriod
+	);
+
 	const { data: gift, refetch: refetchGift } = useGetGiftByIdQuery(id);
-	const { data: stats, refetch: refetchStats } = useGetGiftStatsQuery(id);
+	const { data: stats, refetch: refetchStats } = useGetGiftStatsQuery({
+		id,
+		period: period === "24h" ? undefined : period,
+	});
 	const { data: thumbnailUrl } = useGetGiftThumbnailQuery(id);
 	const { data: history, refetch: refetchHistory } = useGetGiftHistoryQuery({
 		id,
 		limit: 15,
 	});
+	const { data: giftNames } = useGetGiftNamesQuery();
 
 	const formatDateTime = (isoString: string) => {
 		try {
@@ -129,6 +141,13 @@ export const GiftDetails = () => {
 		);
 	}
 
+	const handlePeriodChange = async (
+		newPeriod: "24h" | "7d" | "30d" | "all"
+	) => {
+		setPeriod(newPeriod);
+		await refetchStats();
+	};
+
 	const purchased = stats.total_count - stats.current_count;
 
 	return (
@@ -139,8 +158,8 @@ export const GiftDetails = () => {
 						<button
 							onClick={() => navigate(-1)}
 							className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 
-                      backdrop-blur-sm rounded-lg border border-gray-700/50 hover:border-gray-600/50 
-                      transition-all text-gray-300 hover:text-white"
+                backdrop-blur-sm rounded-lg border border-gray-700/50 hover:border-gray-600/50 
+                transition-all text-gray-300 hover:text-white"
 						>
 							<ArrowLeft className="h-4 w-4" />
 							Назад
@@ -180,7 +199,8 @@ export const GiftDetails = () => {
 
 						<div className="flex-grow text-center sm:text-left">
 							<h2 className="text-xl font-bold text-white mb-2">
-								Telegram Подарок {gift.emoji}
+								{giftNames?.[gift.telegram_id] ||
+									`Telegram Подарок ${gift.emoji}`}
 							</h2>
 							<div className="space-y-2">
 								<p className="text-gray-400 text-sm flex items-center justify-center sm:justify-start gap-2">
@@ -243,7 +263,11 @@ export const GiftDetails = () => {
 					</div>
 				</div>
 
-				<GiftStats hourlyStats={stats.analytics.hourly_stats} />
+				<GiftStats
+					hourlyStats={stats.analytics.hourly_stats}
+					period={period}
+					onPeriodChange={handlePeriodChange}
+				/>
 
 				<GiftHistory history={history} formatDateTime={formatDateTime} />
 			</div>

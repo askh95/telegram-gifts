@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useUserTimezone } from "../hooks/useUserTimezone";
 import { useGetGiftThumbnailQuery } from "../store/api/gifts";
+import { useGetGiftNamesQuery } from "../store/api/monitor";
 
 interface GiftCardProps {
 	gift: Gift;
@@ -13,9 +14,11 @@ interface GiftCardProps {
 export const GiftCard = ({ gift, onClick }: GiftCardProps) => {
 	const { offset } = useUserTimezone();
 	const { data: thumbnailUrl } = useGetGiftThumbnailQuery(gift.telegram_id);
+	const { data: giftNames } = useGetGiftNamesQuery();
 	const percentComplete = (gift.remaining_count / gift.total_count) * 100;
 
 	const isSoldOut = gift.status === "sold_out";
+	const giftName = giftNames?.[gift.telegram_id];
 
 	const formatLastUpdated = (timestamp: string) => {
 		const date = dayjs.utc(timestamp);
@@ -74,6 +77,12 @@ export const GiftCard = ({ gift, onClick }: GiftCardProps) => {
 							{gift.star_count.toLocaleString()}
 						</span>
 					</div>
+
+					{giftName && (
+						<div className="text-center sm:text-left text-base font-medium text-gray-400 mb-2">
+							{giftName}
+						</div>
+					)}
 
 					<div>
 						{gift.remaining_count > 0 ? (
