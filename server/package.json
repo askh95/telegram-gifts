@@ -32,11 +32,11 @@
 		"sharp": "^0.33.5",
 		"sqlite": "^5.1.1",
 		"sqlite3": "^5.1.7",
-		"typescript": "^5.7.3",
 		"uuid": "^11.0.5"
 	},
 	"devDependencies": {
 		"nodemon": "^3.1.9",
-		"ts-node": "^10.9.2"
+		"ts-node": "^10.9.2",
+		"typescript": "^5.7.3"
 	}
 }

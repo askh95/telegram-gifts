@@ -20,6 +20,7 @@ interface HistoryRecord {
 interface GiftWithFormattedDate extends Gift {
 	formatted_last_updated: string;
 }
+
 interface ExistingGift {
 	telegram_id: string;
 	remaining_count: number;
@@ -39,6 +40,7 @@ interface PaginationQuery {
 	minRemaining?: string;
 	maxRemaining?: string;
 	status?: string;
+	period?: "24h" | "7d" | "30d" | "all";
 }
 
 export class GiftController {
@@ -183,6 +185,172 @@ export class GiftController {
 		}
 	}
 
+	async getGiftStats(req: Request, res: Response) {
+		try {
+			const giftId = req.params.id;
+			const period = req.query.period as "24h" | "7d" | "30d" | "all";
+
+			const {
+				rows: [result],
+			} = await this.pool.query(
+				`
+            WITH gift_data AS (
+              SELECT 
+                g.*,
+                to_char(g.last_updated AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00"') as formatted_last_updated
+              FROM gifts g 
+              WHERE g.telegram_id = $1
+            ),
+            hourly_stats AS (
+              SELECT 
+                date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC') as hour,
+                COALESCE(SUM(gh.change_amount), 0)::INTEGER as purchase_count
+              FROM gifts_history gh
+              WHERE 
+                gh.telegram_id = $1 
+                AND gh.last_updated >= NOW() AT TIME ZONE 'UTC' - CASE 
+                  WHEN $2 = '7d' THEN interval '7 days'
+                  WHEN $2 = '30d' THEN interval '30 days'
+                  WHEN $2 = '24h' OR $2 IS NULL THEN interval '24 hours'
+                  ELSE interval '100 years'
+                END
+              GROUP BY date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC')
+            ),
+            latest_prediction AS (
+              SELECT 
+                predicted_sold_out_date,
+                confidence,
+                prediction_data,
+                created_at
+              FROM gift_predictions
+              WHERE gift_id = $1
+              ORDER BY created_at DESC
+              LIMIT 1
+            ),
+            purchase_stats AS (
+              SELECT 
+                MIN(last_updated) as first_update,
+                COALESCE(SUM(CASE 
+                  WHEN last_updated >= NOW() AT TIME ZONE 'UTC' - CASE 
+                    WHEN $2 = '7d' THEN interval '7 days'
+                    WHEN $2 = '30d' THEN interval '30 days'
+                    WHEN $2 = '24h' OR $2 IS NULL THEN interval '24 hours'
+                    ELSE interval '100 years'
+                  END
+                  THEN change_amount 
+                  ELSE 0 
+                END), 0)::INTEGER as purchases_period,
+                COALESCE(SUM(CASE 
+                  WHEN last_updated >= NOW() AT TIME ZONE 'UTC' - interval '24 hours'
+                  THEN change_amount 
+                  ELSE 0 
+                END), 0)::INTEGER as purchases_24h,
+                COUNT(DISTINCT DATE_TRUNC('day', last_updated)) as active_days
+              FROM gifts_history
+              WHERE telegram_id = $1 AND change_amount > 0
+            )
+            SELECT 
+              g.*,
+              p.*,
+              lp.predicted_sold_out_date,
+              lp.confidence,
+              lp.prediction_data,
+              lp.created_at as prediction_created_at,
+              COALESCE(json_agg(
+                json_build_object(
+                  'date', to_char(h.hour AT TIME ZONE 'UTC', 'YYYY-MM-DD'),
+                  'hour', to_char(h.hour AT TIME ZONE 'UTC', 'HH24:00'),
+                  'count', h.purchase_count
+                ) ORDER BY h.hour
+              ) FILTER (WHERE h.hour IS NOT NULL), '[]') as hourly_data
+            FROM gift_data g
+            CROSS JOIN purchase_stats p
+            LEFT JOIN latest_prediction lp ON true
+            LEFT JOIN hourly_stats h ON true
+            GROUP BY 
+              g.telegram_id, g.custom_emoji_id, g.emoji, g.file_id, 
+              g.file_size, g.file_unique_id, g.height, g.width,
+              g.is_animated, g.is_video, g.star_count, g.remaining_count,
+              g.total_count, g.status, g.thumbnail_file_id, 
+              g.thumbnail_file_unique_id, g.thumbnail_file_size,
+              g.thumbnail_width, g.thumbnail_height, g.thumb_file_id,
+              g.thumb_file_unique_id, g.thumb_file_size, g.thumb_width,
+              g.thumb_height, g.last_updated, g.formatted_last_updated,
+              p.first_update, p.purchases_period, p.purchases_24h, p.active_days,
+              lp.predicted_sold_out_date, lp.confidence, 
+              lp.prediction_data, lp.created_at`,
+				[giftId, period]
+			);
+
+			if (!result) {
+				return res.status(404).json({ error: "Gift not found" });
+			}
+
+			const hourlyStats = result.hourly_data.filter(
+				(stat: any) => stat.count > 0
+			);
+
+			let peakHour = { hour: "00:00", count: 0 };
+			for (const stat of hourlyStats) {
+				if (stat.count > peakHour.count) {
+					peakHour = stat;
+				}
+			}
+
+			const hoursToCount = Math.min(
+				24,
+				Math.max(1, moment().diff(moment(result.first_update), "hours"))
+			);
+			const currentRate = Math.round(result.purchases_24h / hoursToCount);
+
+			const response = {
+				gift_id: giftId,
+				current_count: result.remaining_count,
+				total_count: result.total_count,
+				status: result.status,
+				period: period || "24h",
+				analytics: {
+					peak_hour: {
+						date: result.date,
+						hour: peakHour.hour,
+						count: peakHour.count,
+					},
+					purchase_rate: currentRate,
+					prediction: result.predicted_sold_out_date
+						? {
+								remaining: result.remaining_count,
+								predicted_sold_out: result.predicted_sold_out_date,
+								confidence: result.confidence,
+								avg_hourly_rate: Math.round(result.purchases_period / 24),
+								total_purchases_period: result.purchases_period,
+						  }
+						: null,
+					hourly_stats: hourlyStats,
+					active_days: result.active_days,
+					total_purchases: result.purchases_period,
+				},
+				last_updated: result.formatted_last_updated,
+			};
+
+			res.json(response);
+
+			if (
+				!result.prediction_created_at ||
+				moment(result.prediction_created_at).isBefore(
+					moment().subtract(30, "minutes")
+				)
+			) {
+				this.analyticsService.updatePrediction(giftId).catch(console.error);
+			}
+		} catch (error) {
+			console.error("Error getting gift stats:", error);
+			res.status(500).json({
+				error: "Failed to fetch gift statistics",
+				details: error instanceof Error ? error.message : "Unknown error",
+			});
+		}
+	}
+
 	async getAllGifts(
 		req: Request<any, any, any, PaginationQuery>,
 		res: Response
@@ -297,154 +465,6 @@ export class GiftController {
 		} catch (error) {
 			console.error("Error fetching gift by ID:", error);
 			res.status(500).json({ error: "Failed to fetch gift details" });
-		}
-	}
-
-	async getGiftStats(req: Request, res: Response) {
-		try {
-			const giftId = req.params.id;
-
-			const {
-				rows: [result],
-			} = await this.pool.query(
-				`
-                WITH gift_data AS (
-                    SELECT 
-                        g.*,
-                        to_char(g.last_updated AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00"') as formatted_last_updated
-                    FROM gifts g 
-                    WHERE g.telegram_id = $1
-                ),
-                hourly_stats AS (
-                    SELECT 
-                        date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC') as hour,
-                        COALESCE(SUM(gh.change_amount), 0)::INTEGER as purchase_count
-                    FROM gifts_history gh
-                    WHERE 
-                        gh.telegram_id = $1 
-                        AND gh.last_updated >= NOW() AT TIME ZONE 'UTC' - interval '24 hours'
-                    GROUP BY date_trunc('hour', gh.last_updated AT TIME ZONE 'UTC')
-                ),
-                latest_prediction AS (
-                    SELECT 
-                        predicted_sold_out_date,
-                        confidence,
-                        prediction_data,
-                        created_at
-                    FROM gift_predictions
-                    WHERE gift_id = $1
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                ),
-                purchase_stats AS (
-                    SELECT 
-                        MIN(last_updated) as first_update,
-                        COALESCE(SUM(CASE 
-                            WHEN last_updated >= NOW() - interval '24 hours' 
-                            THEN change_amount 
-                            ELSE 0 
-                        END), 0)::INTEGER as purchases_24h
-                    FROM gifts_history
-                    WHERE telegram_id = $1 AND change_amount > 0
-                )
-                SELECT 
-                    g.*,
-                    p.*,
-                    lp.predicted_sold_out_date,
-                    lp.confidence,
-                    lp.prediction_data,
-                    lp.created_at as prediction_created_at,
-                    json_agg(
-                        json_build_object(
-                            'hour', to_char(h.hour AT TIME ZONE 'UTC', 'HH24:00'),
-                            'count', h.purchase_count
-                        ) ORDER BY h.hour
-                    ) as hourly_data
-                FROM gift_data g
-                CROSS JOIN purchase_stats p
-                LEFT JOIN latest_prediction lp ON true
-                LEFT JOIN hourly_stats h ON true
-                GROUP BY 
-                    g.telegram_id, g.custom_emoji_id, g.emoji, g.file_id, 
-                    g.file_size, g.file_unique_id, g.height, g.width,
-                    g.is_animated, g.is_video, g.star_count, g.remaining_count,
-                    g.total_count, g.status, g.thumbnail_file_id, 
-                    g.thumbnail_file_unique_id, g.thumbnail_file_size,
-                    g.thumbnail_width, g.thumbnail_height, g.thumb_file_id,
-                    g.thumb_file_unique_id, g.thumb_file_size, g.thumb_width,
-                    g.thumb_height, g.last_updated, g.formatted_last_updated,
-                    p.first_update, p.purchases_24h, lp.predicted_sold_out_date,
-                    lp.confidence, lp.prediction_data, lp.created_at
-            `,
-				[giftId]
-			);
-
-			if (!result) {
-				return res.status(404).json({ error: "Gift not found" });
-			}
-
-			const hourlyStats = result.hourly_data.filter(
-				(stat: any) => stat.count > 0
-			);
-			let peakHour = { hour: "00:00", count: 0 };
-			for (const stat of hourlyStats) {
-				if (stat.count > peakHour.count) {
-					peakHour = stat;
-				}
-			}
-
-			const total24hPurchases = hourlyStats.reduce(
-				(sum: number, stat: any) => sum + stat.count,
-				0
-			);
-
-			const hoursToCount = Math.min(
-				24,
-				Math.max(1, moment().diff(moment(result.first_update), "hours"))
-			);
-			const currentRate = Math.round(result.purchases_24h / hoursToCount);
-
-			const response = {
-				gift_id: giftId,
-				current_count: result.remaining_count,
-				total_count: result.total_count,
-				status: result.status,
-				analytics: {
-					peak_hour: {
-						hour: peakHour.hour,
-						count: peakHour.count,
-					},
-					purchase_rate: currentRate,
-					prediction: result.predicted_sold_out_date
-						? {
-								remaining: result.remaining_count,
-								predicted_sold_out: result.predicted_sold_out_date,
-								confidence: result.confidence,
-								avg_hourly_rate: Math.round(total24hPurchases / 24),
-								total_purchases_24h: total24hPurchases,
-						  }
-						: null,
-					hourly_stats: hourlyStats,
-				},
-				last_updated: result.formatted_last_updated,
-			};
-
-			res.json(response);
-
-			if (
-				!result.prediction_created_at ||
-				moment(result.prediction_created_at).isBefore(
-					moment().subtract(30, "minutes")
-				)
-			) {
-				this.analyticsService.updatePrediction(giftId).catch(console.error);
-			}
-		} catch (error) {
-			console.error("Error getting gift stats:", error);
-			res.status(500).json({
-				error: "Failed to fetch gift statistics",
-				details: error instanceof Error ? error.message : "Unknown error",
-			});
 		}
 	}
 
