@@ -25,14 +25,14 @@ import { GiftHistory } from "../components/GiftHistory";
 import { GiftStats } from "../components/GiftStats";
 import { useGetGiftNamesQuery } from "../store/api/monitor";
 
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(customParseFormat);
+
 interface AnimatedValueProps {
 	value: number;
 	formatter?: (value: number) => string;
 }
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
-dayjs.extend(customParseFormat);
 
 const AnimatedValue = ({
 	value,
@@ -70,15 +70,7 @@ export const GiftDetails = () => {
 	const { id = "" } = useParams();
 	const navigate = useNavigate();
 
-	const { data: initialStats } = useGetGiftStatsQuery({
-		id,
-		period: undefined,
-	});
-
-	const defaultPeriod = initialStats?.current_count === 0 ? "all" : "24h";
-	const [period, setPeriod] = useState<"24h" | "7d" | "30d" | "all">(
-		defaultPeriod
-	);
+	const [period, setPeriod] = useState<"24h" | "7d" | "30d" | "all">("24h");
 
 	const { data: gift, refetch: refetchGift } = useGetGiftByIdQuery(id);
 	const { data: stats, refetch: refetchStats } = useGetGiftStatsQuery({
@@ -91,6 +83,12 @@ export const GiftDetails = () => {
 		limit: 15,
 	});
 	const { data: giftNames } = useGetGiftNamesQuery();
+
+	useEffect(() => {
+		if (stats?.status === "sold_out" || stats?.current_count === 0) {
+			setPeriod("all");
+		}
+	}, [stats?.status, stats?.current_count]);
 
 	const formatDateTime = (isoString: string) => {
 		try {
@@ -153,6 +151,7 @@ export const GiftDetails = () => {
 	return (
 		<div className="min-h-screen bg-gray-900 text-white p-6">
 			<div className="max-w-7xl mx-auto space-y-6">
+				{/* Header */}
 				<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 					<div className="flex items-center gap-4">
 						<button
@@ -174,23 +173,21 @@ export const GiftDetails = () => {
 				<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700/50">
 					<div className="flex flex-col sm:flex-row items-center gap-6">
 						<div className="relative w-32 h-32 flex-shrink-0">
-							<div className="w-full h-full flex items-center justify-center bg-gray-700/50 rounded-lg">
-								<div className="w-full h-full flex items-center justify-center bg-gray-700/50 rounded-lg overflow-hidden">
-									<img
-										src={thumbnailUrl}
-										alt={gift.emoji}
-										className="w-full h-full object-contain transform transition-transform duration-200 hover:scale-110"
-										onError={(e) => {
-											const target = e.target as HTMLImageElement;
-											target.onerror = null;
-											target.className = "hidden";
-											target.parentElement?.insertAdjacentHTML(
-												"beforeend",
-												`<span class="text-7xl">${gift.emoji}</span>`
-											);
-										}}
-									/>
-								</div>
+							<div className="w-full h-full flex items-center justify-center bg-gray-700/50 rounded-lg overflow-hidden">
+								<img
+									src={thumbnailUrl}
+									alt={gift.emoji}
+									className="w-full h-full object-contain transform transition-transform duration-200 hover:scale-110"
+									onError={(e) => {
+										const target = e.target as HTMLImageElement;
+										target.onerror = null;
+										target.className = "hidden";
+										target.parentElement?.insertAdjacentHTML(
+											"beforeend",
+											`<span class="text-7xl">${gift.emoji}</span>`
+										);
+									}}
+								/>
 							</div>
 							<div className="absolute top-2 right-2 bg-blue-500/80 backdrop-blur-sm text-white text-sm font-bold px-3 py-1 rounded-full">
 								{gift.star_count} ⭐
