@@ -1,5 +1,6 @@
 // src/store/api/monitor.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { GIFT_NAMES } from "../../constants/giftNames";
 
 interface StartMonitoringRequest {
 	gift_name: string;
@@ -8,10 +9,6 @@ interface StartMonitoringRequest {
 interface StartMonitoringResponse {
 	gift_name: string;
 	status: string;
-}
-
-interface GiftNameMapping {
-	[key: string]: string;
 }
 
 export const monitorApi = createApi({
@@ -28,11 +25,13 @@ export const monitorApi = createApi({
 				body,
 			}),
 		}),
-		getGiftNames: builder.query<GiftNameMapping, void>({
-			query: () => "https://cdn.changes.tg/gifts/id-to-name.json",
-			transformResponse: (response: GiftNameMapping) => {
-				const reversedEntries = [...Object.entries(response)].reverse();
-				return Object.fromEntries(reversedEntries);
+		getGiftNames: builder.query<typeof GIFT_NAMES, void>({
+			queryFn: () => {
+				// Return local data instead of making an HTTP request
+				const reversedEntries = [...Object.entries(GIFT_NAMES)].reverse();
+				return {
+					data: Object.fromEntries(reversedEntries),
+				};
 			},
 		}),
 	}),
