@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Menu, X, Gift, Activity } from "lucide-react";
+import { Menu, X, Gift, Activity, Star } from "lucide-react";
 import logo from "../assets/logo.svg";
 
 export const Navbar = () => {
@@ -45,6 +45,16 @@ export const Navbar = () => {
 						>
 							<Activity className="h-5 w-5" />
 							Мониторинг
+						</NavLink>
+						<NavLink
+							to="/nft"
+							className="flex items-center gap-2 text-xl font-medium text-gray-300 transition-all duration-300 hover:scale-110 hover:text-blue-500"
+							style={({ isActive }) => ({
+								color: isActive ? "#3B82F6" : "",
+							})}
+						>
+							<Star className="h-5 w-5" />
+							NFT
 						</NavLink>
 						<a
 							href="https://t.me/giftsanalyz"
@@ -103,6 +113,17 @@ export const Navbar = () => {
 							>
 								<Activity className="h-5 w-5" />
 								Мониторинг
+							</NavLink>
+							<NavLink
+								to="/nft"
+								className="flex items-center gap-2 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-blue-500"
+								style={({ isActive }) => ({
+									color: isActive ? "#3B82F6" : "",
+								})}
+								onClick={toggleMobileMenu}
+							>
+								<Star className="h-5 w-5" />
+								NFT
 							</NavLink>
 							<a
 								href="https://t.me/giftsanalyz"
