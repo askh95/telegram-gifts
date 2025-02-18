@@ -18,16 +18,12 @@ export const OwnerCard = ({ owner, giftName, index }: OwnerCardProps) => {
 		return [...owner.giftNumbers].sort((a, b) => a - b);
 	}, [owner.giftNumbers]);
 
-	const remainingNumbers = useMemo(() => {
-		return sortedNumbers.slice(3);
-	}, [sortedNumbers]);
+	const visibleNumbers = useMemo(() => {
+		if (showAllNumbers) return sortedNumbers;
+		return sortedNumbers.slice(0, INITIAL_NUMBERS_SHOW);
+	}, [sortedNumbers, showAllNumbers]);
 
-	const visibleRemainingNumbers = useMemo(() => {
-		if (showAllNumbers) return remainingNumbers;
-		return remainingNumbers.slice(0, INITIAL_NUMBERS_SHOW);
-	}, [remainingNumbers, showAllNumbers]);
-
-	const hasMoreNumbers = remainingNumbers.length > INITIAL_NUMBERS_SHOW;
+	const hasMoreNumbers = sortedNumbers.length > INITIAL_NUMBERS_SHOW;
 
 	const getPositionStyles = (position: number) => {
 		if (position === 1)
@@ -42,7 +38,6 @@ export const OwnerCard = ({ owner, giftName, index }: OwnerCardProps) => {
 	return (
 		<div className="group p-6 hover:bg-gray-800/70 transition-all duration-200">
 			<div className="flex items-start gap-4">
-				{/* Номер в списке с градиентным фоном для топ-3 */}
 				<div
 					className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center border border-gray-700/50 
             ${getPositionStyles(
@@ -106,13 +101,12 @@ export const OwnerCard = ({ owner, giftName, index }: OwnerCardProps) => {
 										{showAllNumbers
 											? "Показать меньше"
 											: `Показать еще ${
-													remainingNumbers.length - INITIAL_NUMBERS_SHOW
+													sortedNumbers.length - INITIAL_NUMBERS_SHOW
 											  }`}
 									</button>
 								)}
 
-								{/* Остальные номера */}
-								{visibleRemainingNumbers.map((number) => (
+								{visibleNumbers.map((number) => (
 									<a
 										key={number}
 										href={`https://t.me/nft/${giftName}-${number}`}
