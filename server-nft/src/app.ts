@@ -19,7 +19,7 @@ app.use((req, res, next) => {
 	next();
 });
 
-app.get("/nft/gifts", async (req: Request, res: Response) => {
+app.get("api/nft/gifts", async (req: Request, res: Response) => {
 	try {
 		const gifts = await giftService.getGiftsList();
 		res.json(gifts);
@@ -29,7 +29,7 @@ app.get("/nft/gifts", async (req: Request, res: Response) => {
 	}
 });
 
-app.get("/nft/gifts/:name", async (req: Request, res: Response) => {
+app.get("api/nft/gifts/:name", async (req: Request, res: Response) => {
 	try {
 		const gift = await giftService.getGiftDetails(req.params.name);
 		if (!gift) {
@@ -42,7 +42,7 @@ app.get("/nft/gifts/:name", async (req: Request, res: Response) => {
 	}
 });
 
-app.get("/nft/gifts/:name/owners", async (req: Request, res: Response) => {
+app.get("api/nft/gifts/:name/owners", async (req: Request, res: Response) => {
 	try {
 		const page = parseInt(req.query.page as string) || 1;
 		const limit = parseInt(req.query.limit as string) || 50;
@@ -63,7 +63,7 @@ app.get("/nft/gifts/:name/owners", async (req: Request, res: Response) => {
 });
 
 app.get(
-	"/nft/gifts/:name/models/:modelName",
+	"api/nft/gifts/:name/models/:modelName",
 	async (req: Request, res: Response) => {
 		try {
 			const page = parseInt(req.query.page as string) || 1;
@@ -81,14 +81,14 @@ app.get(
 			res.json(owners);
 		} catch (error) {
 			logger.error(
-				`Error in /nft/gifts/${req.params.name}/models/${req.params.modelName}/owners: ${error}`
+				`Error in api/nft/gifts/${req.params.name}/models/${req.params.modelName}/owners: ${error}`
 			);
 			res.status(500).json({ error: "Internal server error" });
 		}
 	}
 );
 
-app.get("/nft/gifts/:name/models", async (req: Request, res: Response) => {
+app.get("api/nft/gifts/:name/models", async (req: Request, res: Response) => {
 	try {
 		const page = parseInt(req.query.page as string) || 1;
 		const limit = parseInt(req.query.limit as string) || 20;
@@ -105,23 +105,23 @@ app.get("/nft/gifts/:name/models", async (req: Request, res: Response) => {
 		}
 		res.json(models);
 	} catch (error) {
-		logger.error(`Error in /nft/gifts/${req.params.name}/models: ${error}`);
+		logger.error(`Error in api/nft/gifts/${req.params.name}/models: ${error}`);
 		res.status(500).json({ error: "Internal server error" });
 	}
 });
 
-app.get("/nft/gifts/:name/history", async (req: Request, res: Response) => {
+app.get("api/nft/gifts/:name/history", async (req: Request, res: Response) => {
 	try {
 		const limit = parseInt(req.query.limit as string) || 10;
 		const history = await giftService.getGiftHistory(req.params.name, limit);
 		res.json(history);
 	} catch (error) {
-		logger.error(`Error in /nft/gifts/${req.params.name}/history: ${error}`);
+		logger.error(`Error in api/nft/gifts/${req.params.name}/history: ${error}`);
 		res.status(500).json({ error: "Internal server error" });
 	}
 });
 
-app.get("/nft/users/top", async (req: Request, res: Response) => {
+app.get("api/nft/users/top", async (req: Request, res: Response) => {
 	try {
 		const page = parseInt(req.query.page as string) || 1;
 		const limit = parseInt(req.query.limit as string) || 50;
@@ -129,7 +129,7 @@ app.get("/nft/users/top", async (req: Request, res: Response) => {
 		const topUsers = await giftService.getTopUsers(page, limit);
 		res.json(topUsers);
 	} catch (error) {
-		logger.error(`Error in /nft/users/top: ${error}`);
+		logger.error(`Error in api/nft/users/top: ${error}`);
 		res.status(500).json({ error: "Internal server error" });
 	}
 });
@@ -141,19 +141,21 @@ const startServer = async (port: number): Promise<void> => {
 		server.on("listening", () => {
 			logger.success(`Server is running on port ${port}`);
 			logger.info("\nAvailable API endpoints:");
-			logger.info("- GET /nft/gifts - List all gifts");
-			logger.info("- GET /nft/gifts/:name - Get gift details");
+			logger.info("- GET api/nft/gifts - List all gifts");
+			logger.info("- GET api/nft/gifts/:name - Get gift details");
 			logger.info(
-				"- GET /nft/gifts/:name/owners?page=1&limit=50 - Get gift owners with pagination"
+				"- GET api/nft/gifts/:name/owners?page=1&limit=50 - Get gift owners with pagination"
 			);
 			logger.info(
-				"- GET /nft/gifts/:name/models - Get gift models with pagination"
+				"- GET api/nft/gifts/:name/models - Get gift models with pagination"
 			);
 			logger.info(
-				"- GET /nft/gifts/:name/models/:modelName/owners - Get model owners with pagination"
+				"- GET api/nft/gifts/:name/models/:modelName/owners - Get model owners with pagination"
 			);
-			logger.info("- GET /nft/gifts/:name/history - Get gift update history");
-			logger.info("- GET /nft/users/top - Get top users\n");
+			logger.info(
+				"- GET api/nft/gifts/:name/history - Get gift update history"
+			);
+			logger.info("- GET api/nft/users/top - Get top users\n");
 		});
 
 		server.on("error", async (error: any) => {
