@@ -16,7 +16,7 @@ export const nftApi = createApi({
 	tagTypes: ["NFTGifts", "Owners", "Models"],
 	endpoints: (builder) => ({
 		getNFTGifts: builder.query<NFTGift[], void>({
-			query: () => "nft/gifts",
+			query: () => "gifts",
 			providesTags: ["NFTGifts"],
 		}),
 
@@ -29,7 +29,7 @@ export const nftApi = createApi({
 			}
 		>({
 			query: ({ giftName, page = 1, limit = 20 }) => ({
-				url: `nft/gifts/${giftName}/owners`,
+				url: `gifts/${giftName}/owners`,
 				params: { page, limit },
 			}),
 			providesTags: ["Owners"],
@@ -45,7 +45,7 @@ export const nftApi = createApi({
 			}
 		>({
 			query: ({ giftName, page = 1, limit = 1000, search = "" }) => ({
-				url: `nft/gifts/${giftName}/models`,
+				url: `gifts/${giftName}/models`,
 				params: { page, limit, search },
 			}),
 			providesTags: ["Models"],
@@ -61,7 +61,7 @@ export const nftApi = createApi({
 			}
 		>({
 			query: ({ giftName, modelName, page = 1, limit = 30 }) => ({
-				url: `nft/gifts/${giftName}/models/${modelName}`,
+				url: `gifts/${giftName}/models/${modelName}`,
 				params: { page, limit },
 			}),
 			providesTags: ["Owners"],
