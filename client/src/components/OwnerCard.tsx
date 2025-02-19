@@ -41,10 +41,10 @@ export const OwnerCard = ({ owner, giftName, index }: OwnerCardProps) => {
 				<div
 					className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center border border-gray-700/50 
             ${getPositionStyles(
-							index
+							owner.position || index
 						)} font-bold text-lg transition-all duration-200`}
 				>
-					{index}
+					{owner.position || index}
 				</div>
 
 				<div className="flex-1 min-w-0">

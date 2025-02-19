@@ -46,11 +46,13 @@ app.get("/api/nft/gifts/:name/owners", async (req: Request, res: Response) => {
 	try {
 		const page = parseInt(req.query.page as string) || 1;
 		const limit = parseInt(req.query.limit as string) || 50;
+		const search = req.query.search as string;
 
 		const owners = await giftService.getGiftOwners(
 			req.params.name,
 			page,
-			limit
+			limit,
+			search
 		);
 		if (!owners) {
 			return res.status(404).json({ error: "Gift not found" });

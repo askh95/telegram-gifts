@@ -158,7 +158,7 @@ export class GiftService {
 		}
 
 		const timeSinceLastUpdate = Date.now() - latestGift.lastUpdated.getTime();
-		const thirtyMinutesInMs = 2 * 60 * 60 * 1000; // обновление данных епта на каждые 2 часов
+		const thirtyMinutesInMs = 3 * 60 * 60 * 1000; // обновление данных епта на каждые 2 часов
 
 		return timeSinceLastUpdate > thirtyMinutesInMs;
 	}
@@ -348,7 +348,8 @@ export class GiftService {
 	public async getGiftOwners(
 		name: string,
 		page: number = 1,
-		limit: number = 50
+		limit: number = 50,
+		search?: string
 	) {
 		const gift = await Gift.findOne({ name });
 		if (!gift) return null;
@@ -380,10 +381,24 @@ export class GiftService {
 
 		owners.sort((a, b) => b.giftsCount - a.giftsCount);
 
-		const totalOwners = owners.length;
+		owners.forEach((owner, index) => {
+			owner.position = index + 1;
+		});
+
+		let filteredOwners = owners;
+		if (search) {
+			const searchLower = search.toLowerCase();
+			filteredOwners = owners.filter(
+				(owner) =>
+					owner.displayName.toLowerCase().includes(searchLower) ||
+					owner.username?.toLowerCase().includes(searchLower)
+			);
+		}
+
+		const totalOwners = filteredOwners.length;
 		const startIndex = (page - 1) * limit;
 		const endIndex = page * limit;
-		const paginatedOwners = owners.slice(startIndex, endIndex);
+		const paginatedOwners = filteredOwners.slice(startIndex, endIndex);
 
 		return {
 			pagination: {

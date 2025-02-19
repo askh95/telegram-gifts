@@ -7,7 +7,7 @@ export const config = {
 		uri: process.env.MONGODB_URI || "mongodb://localhost:27017/gift-tracker",
 	},
 	api: {
-		updateInterval: "0 */2 * * *",
+		updateInterval: "0 */3 * * *",
 	},
 	gifts: {
 		types: {

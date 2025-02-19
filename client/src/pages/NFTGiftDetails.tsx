@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useGetGiftOwnersQuery, useGetGiftModelsQuery } from "../store/api/nft";
 import { Users, Layers, ArrowLeft, Loader } from "lucide-react";
@@ -7,6 +7,7 @@ import { ModelsList } from "../components/ModelsList";
 import { ModelOwnersModal } from "../components/ModelOwnersModal";
 import type { Owner } from "../types/nft";
 import { useDebounce } from "../hooks/useDebounce";
+import { OwnersSearch } from "../components/OwnersSearch";
 
 type TabType = "OWNERS" | "MODELS";
 
@@ -35,17 +36,21 @@ export const NFTGiftDetails = () => {
 	const [searchQuery, setSearchQuery] = useState("");
 	const debouncedSearch = useDebounce(searchQuery, 300);
 
-	const { data: ownersData, isFetching: isOwnersLoading } =
-		useGetGiftOwnersQuery(
-			{
-				giftName: giftName || "",
-				page: currentPage,
-				limit: ITEMS_PER_PAGE,
-			},
-			{
-				skip: !giftName || activeTab !== TABS.OWNERS,
-			}
-		);
+	const {
+		data: ownersData,
+		isFetching: isOwnersLoading,
+		isError: isOwnersError,
+	} = useGetGiftOwnersQuery(
+		{
+			giftName: giftName || "",
+			page: currentPage,
+			limit: ITEMS_PER_PAGE,
+			search: debouncedSearch,
+		},
+		{
+			skip: !giftName || activeTab !== TABS.OWNERS,
+		}
+	);
 
 	const { data: modelsData, isLoading: isModelsLoading } =
 		useGetGiftModelsQuery(
@@ -62,7 +67,7 @@ export const NFTGiftDetails = () => {
 		setCurrentPage(1);
 		setHasMore(true);
 		setAllOwners([]);
-	}, [activeTab, giftName]);
+	}, [debouncedSearch, activeTab, giftName]);
 
 	useEffect(() => {
 		if (ownersData?.owners) {
@@ -82,7 +87,13 @@ export const NFTGiftDetails = () => {
 			observerRef.current.disconnect();
 		}
 
-		if (activeTab !== TABS.OWNERS || !hasMore || isOwnersLoading) return;
+		if (
+			activeTab !== TABS.OWNERS ||
+			!hasMore ||
+			isOwnersLoading ||
+			isOwnersError
+		)
+			return;
 
 		observerRef.current = new IntersectionObserver(
 			(entries) => {
@@ -114,6 +125,17 @@ export const NFTGiftDetails = () => {
 		const path = tab === TABS.OWNERS ? "owners" : "models";
 		navigate(`/nft/${giftName}/${path}`);
 	};
+
+	const uniqueOwners = useMemo(() => {
+		return Array.from(
+			new Map(
+				allOwners.map((owner) => [
+					`${owner.username}-${owner.displayName}`,
+					owner,
+				])
+			).values()
+		);
+	}, [allOwners]);
 
 	return (
 		<div className="min-h-screen bg-gray-900 text-white">
@@ -153,13 +175,20 @@ export const NFTGiftDetails = () => {
 				<div className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
 					{activeTab === TABS.OWNERS && (
 						<div className="divide-y divide-gray-700/50">
+							<OwnersSearch onSearch={setSearchQuery} />
 							{isOwnersLoading && currentPage === 1 ? (
 								<div className="flex justify-center p-8">
 									<Loader className="w-8 h-8 text-gray-400 animate-spin" />
 								</div>
+							) : isOwnersError ? (
+								<div className="p-8 text-center">
+									<div className="mb-3 text-red-500">
+										Произошла ошибка при загрузке данных
+									</div>
+								</div>
 							) : (
 								<>
-									{allOwners.map((owner, index) => (
+									{uniqueOwners.map((owner, index) => (
 										<OwnerCard
 											key={`${owner.username || ""}-${
 												owner.displayName

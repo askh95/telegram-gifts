@@ -20,6 +20,7 @@ export interface IGiftOwner {
 	giftsCount: number;
 	giftNumbers: number[];
 	isHidden: boolean;
+	position?: number;
 	modelName?: string;
 	models?: Array<{
 		name: string;

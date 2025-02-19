@@ -26,11 +26,12 @@ export const nftApi = createApi({
 				giftName: string;
 				page?: number;
 				limit?: number;
+				search?: string;
 			}
 		>({
-			query: ({ giftName, page = 1, limit = 20 }) => ({
+			query: ({ giftName, page = 1, limit = 20, search = "" }) => ({
 				url: `gifts/${giftName}/owners`,
-				params: { page, limit },
+				params: { page, limit, search },
 			}),
 			providesTags: ["Owners"],
 		}),

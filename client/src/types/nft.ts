@@ -16,6 +16,7 @@ export interface Owner {
 	giftNumbers: number[];
 	isHidden: boolean;
 	modelName?: string;
+	position?: number;
 }
 
 export interface Model {
