@@ -98,7 +98,7 @@ const DonatePage = () => {
 							</div>
 							{crypto.special ? (
 								<a
-									href="https://t.me/giftsanalyz"
+									href="https://t.me/peekNft"
 									target="_blank"
 									rel="noopener noreferrer"
 									className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-[#0098c8] px-6 py-3 text-base text-white transition-all hover:bg-[#0098c8]/80 group"

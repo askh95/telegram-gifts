@@ -60,7 +60,7 @@ export const Navbar = () => {
 							NFT
 						</NavLink>
 						<a
-							href="https://t.me/giftsanalyz"
+							href="https://t.me/peekNft"
 							target="_blank"
 							rel="noopener noreferrer"
 							className="flex items-center gap-2 text-xl font-medium text-gray-300 transition-all duration-300 hover:scale-110 hover:text-[#0098c8]"
@@ -129,7 +129,7 @@ export const Navbar = () => {
 								NFT
 							</NavLink>
 							<a
-								href="https://t.me/giftsanalyz"
+								href="https://t.me/peekNft"
 								target="_blank"
 								rel="noopener noreferrer"
 								className="flex items-center gap-2 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-[#0098c8]"
