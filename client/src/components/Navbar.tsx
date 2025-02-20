@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { Menu, X, Gift, Activity, Star } from "lucide-react";
-import logo from "../assets/logo.svg";
+import Lottie from "lottie-react";
+import radarAnimation from "../assets/radar.json";
 
 export const Navbar = () => {
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -15,11 +16,13 @@ export const Navbar = () => {
 			<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 				<div className="flex h-16 items-center justify-between sm:h-20 md:h-24">
 					<NavLink to="/" className="flex items-center">
-						<img
-							src={logo}
-							alt="Logo"
-							className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10"
-						/>
+						<div className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10">
+							<Lottie
+								animationData={radarAnimation}
+								loop={true}
+								className="h-full w-full"
+							/>
+						</div>
 						<span className="ml-2 rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-500 sm:px-2 sm:py-1 sm:text-xs">
 							BETA
 						</span>
