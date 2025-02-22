@@ -15,6 +15,7 @@ export const config = {
 			"5868348541058942091": "LovePotion",
 			"5868220813026526561": "ToyBear",
 			"5868503709637411929": "DiamondRing",
+			"5936013938331222567": "Plush Pepe",
 		},
 	},
 };

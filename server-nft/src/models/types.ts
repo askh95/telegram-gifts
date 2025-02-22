@@ -32,6 +32,7 @@ export interface IGiftModel {
 	name: string;
 	ownersCount: number;
 	owners: IGiftOwner[];
+	imageUrl?: string;
 }
 
 export interface IGift {

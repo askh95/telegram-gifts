@@ -5,7 +5,7 @@ import { Users, Layers, ArrowLeft, Loader } from "lucide-react";
 import { OwnerCard } from "../components/OwnerCard";
 import { ModelsList } from "../components/ModelsList";
 import { ModelOwnersModal } from "../components/ModelOwnersModal";
-import type { Owner } from "../types/nft";
+import type { Owner, Model } from "../types/nft";
 import { useDebounce } from "../hooks/useDebounce";
 import { OwnersSearch } from "../components/OwnersSearch";
 
@@ -31,8 +31,10 @@ export const NFTGiftDetails = () => {
 	);
 	const [selectedModel, setSelectedModel] = useState<string | null>(null);
 	const [currentPage, setCurrentPage] = useState(1);
+	const [modelsPage, setModelsPage] = useState(1);
 	const [hasMore, setHasMore] = useState(true);
 	const [allOwners, setAllOwners] = useState<Owner[]>([]);
+	const [allModels, setAllModels] = useState<Model[]>([]);
 	const [searchQuery, setSearchQuery] = useState("");
 	const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -52,21 +54,26 @@ export const NFTGiftDetails = () => {
 		}
 	);
 
-	const { data: modelsData, isLoading: isModelsLoading } =
-		useGetGiftModelsQuery(
-			{
-				giftName: giftName || "",
-				page: 1,
-				limit: 1000,
-				search: debouncedSearch,
-			},
-			{ skip: !giftName || activeTab !== TABS.MODELS }
-		);
+	const {
+		data: modelsData,
+		isLoading: isModelsLoading,
+		isFetching: isModelsFetching,
+	} = useGetGiftModelsQuery(
+		{
+			giftName: giftName || "",
+			page: modelsPage,
+			limit: ITEMS_PER_PAGE,
+			search: debouncedSearch,
+		},
+		{ skip: !giftName || activeTab !== TABS.MODELS }
+	);
 
 	useEffect(() => {
 		setCurrentPage(1);
+		setModelsPage(1);
 		setHasMore(true);
 		setAllOwners([]);
+		setAllModels([]);
 	}, [debouncedSearch, activeTab, giftName]);
 
 	useEffect(() => {
@@ -81,6 +88,16 @@ export const NFTGiftDetails = () => {
 			setHasMore(currentPage < totalPages);
 		}
 	}, [ownersData, currentPage]);
+
+	useEffect(() => {
+		if (modelsData?.models) {
+			if (modelsPage === 1) {
+				setAllModels(modelsData.models);
+			} else {
+				setAllModels((prev) => [...prev, ...(modelsData.models || [])]);
+			}
+		}
+	}, [modelsData?.models, modelsPage]);
 
 	useEffect(() => {
 		if (observerRef.current) {
@@ -115,13 +132,15 @@ export const NFTGiftDetails = () => {
 				observerRef.current.disconnect();
 			}
 		};
-	}, [hasMore, isOwnersLoading, activeTab]);
+	}, [hasMore, isOwnersLoading, activeTab, isOwnersError]);
 
 	const handleTabChange = (tab: TabType) => {
 		setActiveTab(tab);
 		setCurrentPage(1);
+		setModelsPage(1);
 		setHasMore(true);
 		setAllOwners([]);
+		setAllModels([]);
 		const path = tab === TABS.OWNERS ? "owners" : "models";
 		navigate(`/nft/${giftName}/${path}`);
 	};
@@ -136,6 +155,12 @@ export const NFTGiftDetails = () => {
 			).values()
 		);
 	}, [allOwners]);
+
+	const uniqueModels = useMemo(() => {
+		return Array.from(
+			new Map(allModels.map((model) => [model.name, model])).values()
+		);
+	}, [allModels]);
 
 	return (
 		<div className="min-h-screen bg-gray-900 text-white">
@@ -225,18 +250,18 @@ export const NFTGiftDetails = () => {
 
 					{activeTab === TABS.MODELS && (
 						<div className="divide-y divide-gray-700/50">
-							{isModelsLoading ? (
-								<div className="flex justify-center p-8">
-									<Loader className="w-8 h-8 text-gray-400 animate-spin" />
-								</div>
-							) : (
-								<ModelsList
-									models={modelsData?.models || []}
-									onModelSelect={setSelectedModel}
-									onSearch={setSearchQuery}
-									isLoading={isModelsLoading}
-								/>
-							)}
+							<ModelsList
+								models={uniqueModels}
+								giftName={giftName || ""}
+								onModelSelect={setSelectedModel}
+								onSearch={setSearchQuery}
+								isLoading={isModelsLoading}
+								onLoadMore={() => setModelsPage((prev) => prev + 1)}
+								hasMore={
+									(modelsPage || 1) < (modelsData?.pagination?.totalPages || 1)
+								}
+								isFetching={isModelsFetching}
+							/>
 						</div>
 					)}
 				</div>

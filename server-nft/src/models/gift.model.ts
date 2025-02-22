@@ -15,6 +15,7 @@ const GiftModelSchema = new Schema<IGiftModel>({
 	name: { type: String, required: true },
 	ownersCount: { type: Number, required: true },
 	owners: [GiftOwnerSchema],
+	imageUrl: { type: String },
 });
 
 const GiftSchema = new Schema<IGift>({

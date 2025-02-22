@@ -6,6 +6,8 @@ import { telegramService } from "./services/telegramService";
 import { startCronJobs } from "./cron";
 import { logger } from "./utils/logger";
 import cors from "cors";
+import path from "path";
+
 console.log("CORS middleware loaded:", !!cors);
 
 const app = express();
@@ -18,6 +20,11 @@ app.use((req, res, next) => {
 	logger.info(`${req.method} ${req.url}`);
 	next();
 });
+
+app.use(
+	"/images",
+	express.static(path.join(process.cwd(), "public", "images"))
+);
 
 app.get("/api/nft/gifts", async (req: Request, res: Response) => {
 	try {
@@ -63,6 +70,27 @@ app.get("/api/nft/gifts/:name/owners", async (req: Request, res: Response) => {
 		res.status(500).json({ error: "Internal server error" });
 	}
 });
+
+app.get(
+	"/api/nft/gifts/:name/models/:modelName/image",
+	async (req: Request, res: Response) => {
+		try {
+			const imagePath = await giftService.getModelImage(
+				req.params.name,
+				req.params.modelName
+			);
+
+			if (!imagePath) {
+				return res.status(404).json({ error: "Image not found" });
+			}
+
+			res.json({ imageUrl: imagePath });
+		} catch (error) {
+			logger.error(`Error in model image endpoint: ${error}`);
+			res.status(500).json({ error: "Internal server error" });
+		}
+	}
+);
 
 app.get(
 	"/api/nft/gifts/:name/models/:modelName",

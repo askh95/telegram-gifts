@@ -6,6 +6,7 @@ import { logger } from "../utils/logger";
 import { sleep } from "../utils/helpers";
 import { telegramService } from "./telegramService";
 import mongoose from "mongoose";
+import { ImageUtils } from "../utils/image.utils";
 
 export class GiftService {
 	private static instance: GiftService;
@@ -25,12 +26,28 @@ export class GiftService {
 		number: number
 	): Promise<GiftApiResponse | null> {
 		try {
-			return await telegramService.getGiftData(giftType, number);
+			const response = await telegramService.getGiftData(giftType, number);
+			if (!response) return null;
+
+			// Преобразуем ответ в нужный формат
+			const giftResponse: GiftApiResponse = {
+				owner: response.owner,
+				ownerName: response.ownerName,
+				num: response.num,
+				model: response.model,
+				slug: response.slug,
+				issued: response.issued,
+				total: response.total,
+			};
+
+			return giftResponse;
 		} catch (error) {
 			if (error instanceof Error) {
 				logger.error(
 					`Failed to fetch ${giftType} #${number}: ${error.message}`
 				);
+			} else {
+				logger.error(`Failed to fetch ${giftType} #${number}: Unknown error`);
 			}
 			return null;
 		}
@@ -63,17 +80,14 @@ export class GiftService {
 			existingOwner.giftsCount += owner.giftsCount;
 			existingOwner.giftNumbers.push(...owner.giftNumbers);
 
-			// Если есть username, обновляем его
 			if (owner.username) {
 				existingOwner.username = owner.username;
 			}
 
-			// Если хотя бы один гифт не скрыт
 			if (!owner.isHidden) {
 				existingOwner.isHidden = false;
 			}
 
-			// Если есть ownerName и нет username
 			if (owner.ownerName && !existingOwner.username) {
 				existingOwner.ownerName = owner.ownerName;
 			}
@@ -83,17 +97,24 @@ export class GiftService {
 	}
 
 	private async processGiftModel(
+		giftType: string,
 		giftData: GiftApiResponse[]
 	): Promise<Map<string, IGiftModel>> {
 		const modelMap = new Map<string, IGiftModel>();
 
-		giftData.forEach((gift) => {
+		for (const gift of giftData) {
 			if (!modelMap.has(gift.model)) {
 				modelMap.set(gift.model, {
 					name: gift.model,
 					ownersCount: 0,
 					owners: [],
 				});
+
+				const imageUrl = await ImageUtils.downloadImage(giftType, gift.model);
+				if (imageUrl) {
+					const model = modelMap.get(gift.model)!;
+					model.imageUrl = imageUrl;
+				}
 			}
 
 			const model = modelMap.get(gift.model)!;
@@ -112,15 +133,40 @@ export class GiftService {
 			};
 
 			model.owners.push(newOwner);
-		});
+		}
 
-		// Объединяем владельцев для каждой модели
 		for (const model of modelMap.values()) {
 			model.owners = this.mergeOwnerData(model.owners);
 			model.ownersCount = model.owners.length;
 		}
 
 		return modelMap;
+	}
+
+	public async getModelImage(
+		giftName: string,
+		modelName: string
+	): Promise<string | null> {
+		try {
+			const gift = await Gift.findOne({ name: giftName });
+			if (!gift) return null;
+
+			const model = gift.models.find((m) => m.name === modelName);
+			if (!model) return null;
+
+			if (!model.imageUrl) {
+				const imageUrl = await ImageUtils.downloadImage(giftName, modelName);
+				if (imageUrl) {
+					model.imageUrl = imageUrl;
+					await gift.save();
+				}
+			}
+
+			return model.imageUrl || null;
+		} catch (error) {
+			logger.error(`Error getting model image: ${error}`);
+			return null;
+		}
 	}
 
 	private async archiveCurrentVersion(newVersion: number): Promise<void> {
@@ -218,7 +264,7 @@ export class GiftService {
 					await sleep(1000);
 				}
 
-				const modelMap = await this.processGiftModel(giftData);
+				const modelMap = await this.processGiftModel(type, giftData);
 				const giftModels = Array.from(modelMap.values());
 
 				await Gift.findOneAndUpdate(

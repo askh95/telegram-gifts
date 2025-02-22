@@ -67,6 +67,15 @@ export const nftApi = createApi({
 			}),
 			providesTags: ["Owners"],
 		}),
+
+		getModelImage: builder.query<
+			{ imageUrl: string },
+			{ giftName: string; modelName: string }
+		>({
+			query: ({ giftName, modelName }) => ({
+				url: `gifts/${giftName}/models/${modelName}/image`,
+			}),
+		}),
 	}),
 });
 
@@ -75,4 +84,5 @@ export const {
 	useGetGiftOwnersQuery,
 	useGetGiftModelsQuery,
 	useGetModelOwnersQuery,
+	useGetModelImageQuery,
 } = nftApi;
