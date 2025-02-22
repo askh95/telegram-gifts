@@ -5,6 +5,7 @@
 .env.development
 .env.test
 .env.production
+server-nft/public/*
 
 # Telegram session files
 my-account*
