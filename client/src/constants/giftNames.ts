@@ -58,4 +58,8 @@ export const GIFT_NAMES: GiftNameMapping = {
 	"5868348541058942091": "Love Potion",
 	"5868220813026526561": "Toy Bear",
 	"5868503709637411929": "Diamond Ring",
+	"5167939598143193218": "Sakura Flower",
+	"5981026247860290310": "Sleigh Bell",
+	"5897593557492957738": "Top Hat",
+	"5856973938650776169": "Record Player",
 };
