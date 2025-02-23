@@ -72,9 +72,8 @@ export const nftApi = createApi({
 			{ imageUrl: string },
 			{ giftName: string; modelName: string }
 		>({
-			query: ({ giftName, modelName }) => ({
-				url: `gifts/${giftName}/models/${modelName}/image`,
-			}),
+			query: ({ giftName, modelName }) =>
+				`gifts/${giftName}/models/${encodeURIComponent(modelName)}/image`,
 		}),
 	}),
 });
@@ -84,5 +83,4 @@ export const {
 	useGetGiftOwnersQuery,
 	useGetGiftModelsQuery,
 	useGetModelOwnersQuery,
-	useGetModelImageQuery,
 } = nftApi;

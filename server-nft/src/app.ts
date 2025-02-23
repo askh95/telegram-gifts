@@ -7,6 +7,7 @@ import { startCronJobs } from "./cron";
 import { logger } from "./utils/logger";
 import cors from "cors";
 import path from "path";
+import { imageService } from "./services/image.service";
 
 console.log("CORS middleware loaded:", !!cors);
 
@@ -20,11 +21,6 @@ app.use((req, res, next) => {
 	logger.info(`${req.method} ${req.url}`);
 	next();
 });
-
-app.use(
-	"/images",
-	express.static(path.join(process.cwd(), "public", "images"))
-);
 
 app.get("/api/nft/gifts", async (req: Request, res: Response) => {
 	try {
@@ -75,22 +71,63 @@ app.get(
 	"/api/nft/gifts/:name/models/:modelName/image",
 	async (req: Request, res: Response) => {
 		try {
-			const imagePath = await giftService.getModelImage(
+			const existingImage = await imageService.getImageByGiftAndModel(
 				req.params.name,
 				req.params.modelName
 			);
 
-			if (!imagePath) {
-				return res.status(404).json({ error: "Image not found" });
+			if (existingImage) {
+				const result = await imageService.getImage(existingImage);
+				if (result) {
+					res.setHeader("Content-Type", result.contentType);
+					return result.stream.pipe(res);
+				}
 			}
 
-			res.json({ imageUrl: imagePath });
+			const formattedGiftName = req.params.name
+				.replace(/([A-Z])/g, " $1")
+				.trim();
+			const imageUrl = `https://cdn.changes.tg/gifts/models/${encodeURIComponent(
+				formattedGiftName
+			)}/png/${encodeURIComponent(req.params.modelName)}.png`;
+
+			const imageId = await imageService.saveImage(
+				imageUrl,
+				req.params.name,
+				req.params.modelName
+			);
+
+			const newResult = await imageService.getImage(imageId);
+			if (!newResult) {
+				return res.status(404).json({ error: "Failed to save image" });
+			}
+
+			res.setHeader("Content-Type", newResult.contentType);
+			newResult.stream.pipe(res);
 		} catch (error) {
-			logger.error(`Error in model image endpoint: ${error}`);
+			logger.error(
+				`Error in /api/nft/gifts/${req.params.name}/models/${req.params.modelName}/image: ${error}`
+			);
 			res.status(500).json({ error: "Internal server error" });
 		}
 	}
 );
+
+app.get("/api/images/:imageId", async (req: Request, res: Response) => {
+	try {
+		const result = await imageService.getImage(req.params.imageId);
+
+		if (!result) {
+			return res.status(404).json({ error: "Image not found" });
+		}
+
+		res.setHeader("Content-Type", result.contentType);
+		result.stream.pipe(res);
+	} catch (error) {
+		logger.error(`Error serving image: ${error}`);
+		res.status(500).json({ error: "Internal server error" });
+	}
+});
 
 app.get(
 	"/api/nft/gifts/:name/models/:modelName",
@@ -213,6 +250,9 @@ const startup = async () => {
 		logger.info("Initializing Telegram client...");
 		await telegramService.init();
 		logger.success("Telegram client initialized");
+
+		await imageService.init();
+		logger.success("ImageService initialized");
 
 		startCronJobs();
 		logger.info("Cron jobs started");

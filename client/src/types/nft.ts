@@ -23,6 +23,7 @@ export interface Model {
 	name: string;
 	ownersCount: number;
 	totalGifts: number;
+	imageUrl?: string;
 }
 
 export interface ModelOwner extends Owner {

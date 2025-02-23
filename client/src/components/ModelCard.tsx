@@ -1,7 +1,5 @@
 // src/components/ModelCard.tsx
 import { Model } from "../types/nft";
-import { Layers } from "lucide-react";
-import { useGetModelImageQuery } from "../store/api/nft";
 
 interface ModelCardProps {
 	model: Model;
@@ -10,11 +8,6 @@ interface ModelCardProps {
 }
 
 export const ModelCard = ({ model, giftName, onClick }: ModelCardProps) => {
-	const { data: imageData } = useGetModelImageQuery({
-		giftName,
-		modelName: model.name,
-	});
-
 	return (
 		<div
 			onClick={onClick}
@@ -22,44 +15,28 @@ export const ModelCard = ({ model, giftName, onClick }: ModelCardProps) => {
                    group border-b border-gray-700/50 hover:border-gray-600/50 first:rounded-t-xl last:rounded-b-xl"
 		>
 			<div className="flex items-center gap-6">
-				{imageData?.imageUrl ? (
-					<div className="relative group-hover:scale-105 transition-all duration-300">
-						<div
-							className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 
+				<div className="relative group-hover:scale-105 transition-all duration-300">
+					<div
+						className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 
                              rounded-2xl blur-xl opacity-25 group-hover:opacity-50 transition-all duration-300"
-						/>
-						<div
-							className="relative w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-white/10 
+					/>
+					<div
+						className="relative w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-white/10 
                              group-hover:ring-white/20 transition-all"
-						>
-							<img
-								src={`${import.meta.env.VITE_NFT_API.replace("/api/nft", "")}${
-									imageData.imageUrl
-								}`}
-								alt={model.name}
-								className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
-								onError={(e) => {
-									const target = e.target as HTMLImageElement;
-									target.style.display = "none";
-								}}
-							/>
-						</div>
-					</div>
-				) : (
-					<div className="relative group-hover:scale-105 transition-all duration-300">
-						<div
-							className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 
-                             rounded-2xl blur-xl opacity-25 group-hover:opacity-50 transition-all duration-300"
+					>
+						<img
+							src={`${import.meta.env.VITE_NFT_API}/gifts/${giftName}/models/${
+								model.name
+							}/image`}
+							alt={model.name}
+							className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
+							onError={(e) => {
+								const target = e.target as HTMLImageElement;
+								target.style.display = "none";
+							}}
 						/>
-						<div
-							className="relative w-20 h-20 rounded-2xl bg-gradient-to-r from-purple-500 to-blue-500 
-                             flex items-center justify-center ring-1 ring-white/10 
-                             group-hover:ring-white/20 transition-all"
-						>
-							<Layers className="w-10 h-10 text-white/90" />
-						</div>
 					</div>
-				)}
+				</div>
 
 				<div className="flex-1">
 					<div

@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import {
-	useGetModelOwnersQuery,
-	useGetModelImageQuery,
-} from "../store/api/nft";
+import { useGetModelOwnersQuery } from "../store/api/nft";
 import { OwnerCard } from "./OwnerCard";
-import { Layers, X, Loader } from "lucide-react";
+import { X, Loader } from "lucide-react";
 import type { ModelOwner } from "../types/nft";
 import Portal from "./Portal";
 
@@ -24,11 +21,6 @@ export const ModelOwnersModal = ({
 	const [isVisible, setIsVisible] = useState(false);
 	const loaderRef = useRef<HTMLDivElement>(null);
 	const ITEMS_PER_PAGE = 20;
-
-	const { data: imageData } = useGetModelImageQuery({
-		giftName,
-		modelName,
-	});
 
 	const { data, isLoading, isFetching } = useGetModelOwnersQuery(
 		{
@@ -129,47 +121,29 @@ export const ModelOwnersModal = ({
 					onClick={(e) => e.stopPropagation()}
 				>
 					<div className="relative">
-						{/* Blur Background */}
 						<div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-blue-600/10" />
 
-						{/* Header Content */}
 						<div className="relative p-6 border-b border-gray-700/50 flex items-center gap-6">
-							{/* Model Image */}
 							<div className="relative group">
 								<div
 									className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 
                                rounded-2xl blur-xl opacity-25 group-hover:opacity-40 transition-all duration-300"
 								/>
-								{imageData?.imageUrl ? (
-									<div
-										className="relative w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-white/10 
+
+								<div
+									className="relative w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-white/10 
                                  group-hover:ring-white/20 transition-all"
-									>
-										<img
-											src={`${import.meta.env.VITE_NFT_API.replace(
-												"/api/nft",
-												""
-											)}${imageData.imageUrl}`}
-											alt={modelName}
-											className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
-											onError={(e) => {
-												const target = e.target as HTMLImageElement;
-												target.style.display = "none";
-											}}
-										/>
-									</div>
-								) : (
-									<div
-										className="relative w-20 h-20 rounded-2xl bg-gradient-to-r from-purple-500 to-blue-500 
-                                 flex items-center justify-center ring-1 ring-white/10 
-                                 group-hover:ring-white/20 transition-all"
-									>
-										<Layers className="w-10 h-10 text-white/90" />
-									</div>
-								)}
+								>
+									<img
+										src={`${
+											import.meta.env.VITE_NFT_API
+										}/gifts/${giftName}/models/${modelName}/image`}
+										alt={modelName}
+										className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+									/>
+								</div>
 							</div>
 
-							{/* Title and Stats */}
 							<div className="flex-1">
 								<h2 className="text-xl font-semibold text-white mb-2">
 									{modelName}
@@ -192,7 +166,6 @@ export const ModelOwnersModal = ({
 								)}
 							</div>
 
-							{/* Close Button */}
 							<button
 								onClick={handleClose}
 								className="p-2 hover:bg-gray-700/50 rounded-lg transition-all 
@@ -203,7 +176,6 @@ export const ModelOwnersModal = ({
 						</div>
 					</div>
 
-					{/* Content */}
 					<div className="overflow-y-auto max-h-[calc(80vh-8rem)]">
 						{isLoading && page === 1 ? (
 							<div className="flex justify-center p-8">

@@ -1,9 +1,10 @@
+// src/components/NFTGiftCard.tsx
 import { NFTGift } from "../types/nft";
 import { Clock, Layers } from "lucide-react";
-import { useGetGiftModelsQuery, useGetModelImageQuery } from "../store/api/nft";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useUserTimezone } from "../hooks/useUserTimezone";
+import { useGetGiftModelsQuery } from "../store/api/nft";
 
 interface NFTGiftCardProps {
 	gift: NFTGift;
@@ -14,19 +15,14 @@ export const NFTGiftCard = ({ gift, onClick }: NFTGiftCardProps) => {
 	const { offset } = useUserTimezone();
 	const percentComplete = (gift.issued / gift.total) * 100;
 
-	const { data: modelsData } = useGetGiftModelsQuery({
-		giftName: gift.name,
-		limit: 1,
-	});
-
-	const firstModel = modelsData?.models?.[0];
-	const { data: imageData } = useGetModelImageQuery(
+	const { data: modelsData } = useGetGiftModelsQuery(
 		{
 			giftName: gift.name,
-			modelName: firstModel?.name || "",
+			page: 1,
+			limit: 1,
 		},
 		{
-			skip: !firstModel,
+			skip: !gift.name,
 		}
 	);
 
@@ -54,48 +50,30 @@ export const NFTGiftCard = ({ gift, onClick }: NFTGiftCardProps) => {
 		>
 			<div className="relative z-10 flex flex-col sm:flex-row items-center gap-3 md:gap-4">
 				<div className="relative w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0">
-					{imageData?.imageUrl ? (
-						<div
-							className="w-full h-full rounded-lg overflow-hidden ring-2 ring-purple-500/20 
-                           group-hover:ring-purple-500/40 transition-all"
-						>
+					<div
+						className="w-full h-full flex items-center justify-center rounded-lg 
+    bg-gradient-to-b from-gray-700/50 to-gray-800/50 
+    shadow-inner shadow-purple-500/5"
+					>
+						{modelsData?.models?.[0] ? (
 							<img
-								src={`${import.meta.env.VITE_NFT_API.replace("/api/nft", "")}${
-									imageData.imageUrl
-								}`}
-								alt={gift.name}
-								className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-300"
+								src={`${import.meta.env.VITE_NFT_API}/gifts/${
+									gift.name
+								}/models/${modelsData.models[0].name}/image`}
+								className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
 								onError={(e) => {
 									const target = e.target as HTMLImageElement;
-									target.parentElement?.classList.add(
-										"flex",
-										"items-center",
-										"justify-center",
-										"bg-gradient-to-b",
-										"from-gray-700/50",
-										"to-gray-800/50"
-									);
 									target.style.display = "none";
-									const emoji = document.createElement("span");
-									emoji.className = "text-5xl sm:text-6xl";
-									emoji.textContent = "🎁";
-									target.parentElement?.appendChild(emoji);
 								}}
 							/>
-						</div>
-					) : (
-						<div
-							className="w-full h-full flex items-center justify-center rounded-lg 
-                           bg-gradient-to-b from-gray-700/50 to-gray-800/50 
-                           shadow-inner shadow-purple-500/5"
-						>
+						) : (
 							<span className="text-5xl sm:text-6xl">🎁</span>
-						</div>
-					)}
+						)}
+					</div>
 					<div
 						className="absolute -top-2 -right-2 px-2.5 py-1 rounded-lg text-xs font-medium 
-                         bg-gradient-to-r from-purple-500 to-blue-500 text-white
-                         shadow-lg shadow-purple-500/20"
+              bg-gradient-to-r from-purple-500 to-blue-500 text-white
+              shadow-lg shadow-purple-500/20"
 					>
 						NFT
 					</div>
@@ -108,8 +86,8 @@ export const NFTGiftCard = ({ gift, onClick }: NFTGiftCardProps) => {
 						</h3>
 						<div
 							className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg 
-                           bg-gradient-to-r from-gray-700/50 to-gray-800/50 
-                           order-1 sm:order-2 shadow-inner shadow-purple-500/5"
+                bg-gradient-to-r from-gray-700/50 to-gray-800/50 
+                order-1 sm:order-2 shadow-inner shadow-purple-500/5"
 						>
 							<Layers className="h-4 w-4 text-blue-400" />
 							<span className="text-sm font-medium text-gray-200">
@@ -136,8 +114,8 @@ export const NFTGiftCard = ({ gift, onClick }: NFTGiftCardProps) => {
 							</span>
 							<div
 								className="relative flex w-full h-6 overflow-hidden rounded-2xl 
-                            bg-gradient-to-r from-gray-700/50 to-gray-800/50 my-4
-                            shadow-inner shadow-purple-500/5"
+                  bg-gradient-to-r from-gray-700/50 to-gray-800/50 my-4
+                  shadow-inner shadow-purple-500/5"
 							>
 								<div
 									role="progressbar"
@@ -146,14 +124,14 @@ export const NFTGiftCard = ({ gift, onClick }: NFTGiftCardProps) => {
 									aria-valuemax={100}
 									style={{ width: `${percentComplete}%` }}
 									className="flex h-full items-center justify-center 
-                            bg-gradient-to-r from-blue-500 to-blue-600 
-                            rounded-2xl transition-all duration-300
-                            shadow-lg shadow-blue-500/20"
+                    bg-gradient-to-r from-blue-500 to-blue-600 
+                    rounded-2xl transition-all duration-300
+                    shadow-lg shadow-blue-500/20"
 								/>
 								<div
 									className="absolute right-0 top-1/2 -translate-y-1/2 
-                              px-4 text-base font-medium text-gray-300
-                              text-shadow-sm shadow-purple-500/50"
+                    px-4 text-base font-medium text-gray-300
+                    text-shadow-sm shadow-purple-500/50"
 								>
 									{gift.total.toLocaleString()}
 								</div>
@@ -162,10 +140,11 @@ export const NFTGiftCard = ({ gift, onClick }: NFTGiftCardProps) => {
 
 						<div
 							className="flex items-center justify-center sm:justify-start gap-2 
-                          mt-3 px-2.5 py-1 rounded-lg text-gray-400"
+                mt-3 px-2.5 py-1 rounded-lg 
+                 "
 						>
-							<Clock className="h-4 w-4" />
-							<span className="text-sm">
+							<Clock className="h-4 w-4 text-gray-400" />
+							<span className="text-sm ">
 								Обновлено {formatLastUpdated(gift.lastUpdated)}
 							</span>
 						</div>
