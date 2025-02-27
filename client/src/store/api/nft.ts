@@ -15,8 +15,16 @@ export const nftApi = createApi({
 	baseQuery: fetchBaseQuery({ baseUrl: BASE_URL }),
 	tagTypes: ["NFTGifts", "Owners", "Models"],
 	endpoints: (builder) => ({
-		getNFTGifts: builder.query<NFTGift[], void>({
-			query: () => "gifts",
+		getNFTGifts: builder.query<
+			PaginatedResponse<NFTGift>,
+			{ page?: number; limit?: number } | void
+		>({
+			query: (params) => ({
+				url: "gifts",
+				params: params
+					? { page: params.page || 1, limit: params.limit || 20 }
+					: {},
+			}),
 			providesTags: ["NFTGifts"],
 		}),
 

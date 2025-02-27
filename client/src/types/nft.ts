@@ -1,4 +1,5 @@
 // src/types/nft.ts
+// Обновим интерфейс PaginatedResponse для поддержки поля 'gifts'
 
 export interface NFTGift {
 	_id: string;
@@ -103,6 +104,7 @@ export interface PaginatedResponse<T> {
 	owners?: T[];
 	models?: T[];
 	users?: T[];
+	gifts?: T[]; // Добавлено новое поле для списка подарков
 	modelInfo?: Model;
 	results?: T[];
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Menu, X, Gift, Activity, Star } from "lucide-react";
+import { Menu, X, Gift, Star } from "lucide-react";
 import Lottie from "lottie-react";
 import radarAnimation from "../assets/radar.json";
 
@@ -39,7 +39,7 @@ export const Navbar = () => {
 							<Gift className="h-5 w-5" />
 							Подарки
 						</NavLink>
-						<NavLink
+						{/* <NavLink
 							to="/monitor"
 							className="flex items-center gap-2 text-xl font-medium text-gray-300 transition-all duration-300 hover:scale-110 hover:text-blue-500"
 							style={({ isActive }) => ({
@@ -48,7 +48,7 @@ export const Navbar = () => {
 						>
 							<Activity className="h-5 w-5" />
 							Мониторинг
-						</NavLink>
+						</NavLink> */}
 						<NavLink
 							to="/nft"
 							className="flex items-center gap-2 text-xl font-medium text-gray-300 transition-all duration-300 hover:scale-110 hover:text-blue-500"
@@ -107,7 +107,7 @@ export const Navbar = () => {
 								<Gift className="h-5 w-5" />
 								Подарки
 							</NavLink>
-							<NavLink
+							{/* <NavLink
 								to="/monitor"
 								className="flex items-center gap-2 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-blue-500"
 								style={({ isActive }) => ({
@@ -116,7 +116,7 @@ export const Navbar = () => {
 							>
 								<Activity className="h-5 w-5" />
 								Мониторинг
-							</NavLink>
+							</NavLink> */}
 							<NavLink
 								to="/nft"
 								className="flex items-center gap-2 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-blue-500"

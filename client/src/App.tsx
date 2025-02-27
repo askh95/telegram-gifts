@@ -8,7 +8,7 @@ import { Layout } from "./components/Layout";
 import { GiftList } from "./pages/GiftList";
 import { GiftDetails } from "./pages/GiftDetails";
 import DonatePage from "./pages/DonatePage";
-import { GiftMonitorPage } from "./pages/GiftMonitorPage";
+// import { GiftMonitorPage } from "./pages/GiftMonitorPage";
 import { NFTGiftList } from "./pages/NFTGiftList";
 import NFTGiftDetails from "./pages/NFTGiftDetails";
 import NFTSearchPage from "./pages/NFTSearchPage";
@@ -22,7 +22,7 @@ function App() {
 					<Route path="/gifts" element={<GiftList />} />
 					<Route path="/gifts/:id" element={<GiftDetails />} />
 					<Route path="/donate" element={<DonatePage />} />
-					<Route path="/monitor" element={<GiftMonitorPage />} />
+					{/* <Route path="/monitor" element={<GiftMonitorPage />} /> */}
 					<Route path="/nft" element={<NFTGiftList />} />
 					<Route path="/nft/:giftName/*" element={<NFTGiftDetails />} />
 					<Route path="/search" element={<NFTSearchPage />} />
