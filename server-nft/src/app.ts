@@ -23,8 +23,11 @@ app.use((req, res, next) => {
 
 app.get("/api/nft/gifts", async (req: Request, res: Response) => {
 	try {
-		const gifts = await giftService.getGiftsList();
-		res.json(gifts);
+		const page = parseInt(req.query.page as string) || 1;
+		const limit = parseInt(req.query.limit as string) || 20;
+
+		const result = await giftService.getGiftsList(page, limit);
+		res.json(result);
 	} catch (error) {
 		logger.error(`Error in /api/nft/gifts: ${error}`);
 		res.status(500).json({ error: "Internal server error" });

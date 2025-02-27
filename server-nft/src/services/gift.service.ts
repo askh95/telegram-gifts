@@ -400,18 +400,40 @@ export class GiftService {
 		}
 	}
 
-	public async getGiftsList() {
-		return Gift.find(
-			{},
-			{
-				name: 1,
-				issued: 1,
-				total: 1,
-				modelsCount: 1,
-				version: 1,
-				lastUpdated: 1,
-			}
-		);
+	public async getGiftsList(page: number = 1, limit: number = 20) {
+		try {
+			const totalItems = await Gift.countDocuments({});
+			const totalPages = Math.ceil(totalItems / limit);
+			const startIndex = (page - 1) * limit;
+
+			const gifts = await Gift.find(
+				{},
+				{
+					name: 1,
+					issued: 1,
+					total: 1,
+					modelsCount: 1,
+					version: 1,
+					lastUpdated: 1,
+				}
+			)
+				.sort({ name: 1 })
+				.skip(startIndex)
+				.limit(limit);
+
+			return {
+				pagination: {
+					currentPage: page,
+					totalPages,
+					limit,
+					totalItems,
+				},
+				gifts,
+			};
+		} catch (error) {
+			logger.error(`Error in getGiftsList: ${error}`);
+			throw error;
+		}
 	}
 
 	public async getGiftDetails(name: string) {
