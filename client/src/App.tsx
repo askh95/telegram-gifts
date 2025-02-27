@@ -11,6 +11,7 @@ import DonatePage from "./pages/DonatePage";
 import { GiftMonitorPage } from "./pages/GiftMonitorPage";
 import { NFTGiftList } from "./pages/NFTGiftList";
 import NFTGiftDetails from "./pages/NFTGiftDetails";
+import NFTSearchPage from "./pages/NFTSearchPage";
 
 function App() {
 	return (
@@ -24,6 +25,7 @@ function App() {
 					<Route path="/monitor" element={<GiftMonitorPage />} />
 					<Route path="/nft" element={<NFTGiftList />} />
 					<Route path="/nft/:giftName/*" element={<NFTGiftDetails />} />
+					<Route path="/search" element={<NFTSearchPage />} />
 				</Routes>
 			</Layout>
 		</Router>
