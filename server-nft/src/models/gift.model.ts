@@ -9,6 +9,15 @@ const GiftOwnerSchema = new Schema<IGiftOwner>({
 	giftsCount: { type: Number, required: true },
 	giftNumbers: [{ type: Number }],
 	isHidden: { type: Boolean, default: false },
+	pattern: { type: String },
+	backdrop: { type: String },
+	giftDetails: [
+		{
+			number: { type: Number },
+			pattern: { type: String },
+			backdrop: { type: String },
+		},
+	],
 });
 
 const GiftModelSchema = new Schema<IGiftModel>({
@@ -26,6 +35,8 @@ const GiftSchema = new Schema<IGift>({
 	models: [GiftModelSchema],
 	version: { type: Number, required: true },
 	lastUpdated: { type: Date, default: Date.now },
+	availablePatterns: [{ type: String }],
+	availableBackdrops: [{ type: String }],
 });
 
 const GiftHistorySchema = new Schema<IGiftHistory>({
@@ -36,6 +47,8 @@ const GiftHistorySchema = new Schema<IGiftHistory>({
 	models: [GiftModelSchema],
 	version: { type: Number, required: true },
 	lastUpdated: { type: Date },
+	availablePatterns: [{ type: String }],
+	availableBackdrops: [{ type: String }],
 	replacedAt: { type: Date, required: true },
 	replacedBy: { type: Number, required: true },
 });

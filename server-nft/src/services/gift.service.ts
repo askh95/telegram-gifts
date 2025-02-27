@@ -8,6 +8,7 @@ import { telegramService } from "./telegramService";
 import mongoose from "mongoose";
 import { ImageUtils } from "../utils/image.utils";
 import { imageService } from "./image.service";
+import axios from "axios";
 
 export class GiftService {
 	private static instance: GiftService;
@@ -27,15 +28,22 @@ export class GiftService {
 		number: number
 	): Promise<GiftApiResponse | null> {
 		try {
-			const response = await telegramService.getGiftData(giftType, number);
+			const formattedGiftType = giftType.replace(/\s+/g, "");
+
+			const response = await telegramService.getGiftData(
+				formattedGiftType,
+				number
+			);
 			if (!response) return null;
 
-			// Преобразуем ответ в нужный формат
 			const giftResponse: GiftApiResponse = {
 				owner: response.owner,
 				ownerName: response.ownerName,
+				ownerAddress: response.ownerAddress,
 				num: response.num,
 				model: response.model,
+				pattern: response.pattern,
+				backdrop: response.backdrop,
 				slug: response.slug,
 				issued: response.issued,
 				total: response.total,
@@ -58,6 +66,12 @@ export class GiftService {
 		if (giftData.owner) {
 			return giftData.owner.displayName;
 		}
+		if (giftData.ownerName) {
+			return giftData.ownerName;
+		}
+		if (giftData.ownerAddress) {
+			return giftData.ownerAddress;
+		}
 		return giftData.ownerName || "Unknown";
 	}
 
@@ -74,12 +88,36 @@ export class GiftService {
 					giftNumbers: [],
 					isHidden: true,
 					modelName: owner.modelName,
+					blockchainAddress: owner.blockchainAddress,
+					giftDetails: [],
 				});
 			}
 
 			const existingOwner = ownerMap.get(key)!;
 			existingOwner.giftsCount += owner.giftsCount;
-			existingOwner.giftNumbers.push(...owner.giftNumbers);
+
+			owner.giftNumbers.forEach((giftNumber, index) => {
+				existingOwner.giftNumbers.push(giftNumber);
+
+				if (owner.giftDetails && owner.giftDetails.length > 0) {
+					const detail = owner.giftDetails.find((d) => d.number === giftNumber);
+					if (detail) {
+						existingOwner.giftDetails!.push(detail);
+					} else {
+						existingOwner.giftDetails!.push({
+							number: giftNumber,
+							pattern: owner.pattern || "Unknown",
+							backdrop: owner.backdrop || "Unknown",
+						});
+					}
+				} else {
+					existingOwner.giftDetails!.push({
+						number: giftNumber,
+						pattern: owner.pattern || "Unknown",
+						backdrop: owner.backdrop || "Unknown",
+					});
+				}
+			});
 
 			if (owner.username) {
 				existingOwner.username = owner.username;
@@ -96,7 +134,6 @@ export class GiftService {
 
 		return Array.from(ownerMap.values());
 	}
-
 	private async processGiftModel(
 		giftType: string,
 		giftData: GiftApiResponse[]
@@ -127,10 +164,20 @@ export class GiftService {
 					? `t.me/${gift.owner.username}`
 					: undefined,
 				ownerName: gift.ownerName || undefined,
+				blockchainAddress: gift.ownerAddress || undefined,
 				giftsCount: 1,
 				giftNumbers: [gift.num],
 				isHidden: !gift.owner,
 				modelName: gift.model,
+				pattern: gift.pattern,
+				backdrop: gift.backdrop,
+				giftDetails: [
+					{
+						number: gift.num,
+						pattern: gift.pattern,
+						backdrop: gift.backdrop,
+					},
+				],
 			};
 
 			model.owners.push(newOwner);
@@ -205,9 +252,35 @@ export class GiftService {
 		}
 
 		const timeSinceLastUpdate = Date.now() - latestGift.lastUpdated.getTime();
-		const thirtyMinutesInMs = 3 * 60 * 60 * 1000; // обновление данных епта на каждые 2 часов
+		const updateIntervalMs = 24 * 60 * 60 * 1000;
 
-		return timeSinceLastUpdate > thirtyMinutesInMs;
+		return timeSinceLastUpdate > updateIntervalMs;
+	}
+
+	private async cleanupOldVersions(
+		giftName: string,
+		keepCount: number = 3
+	): Promise<void> {
+		try {
+			const historyRecords = await GiftHistory.find({ name: giftName }).sort({
+				replacedAt: -1,
+			});
+
+			if (historyRecords.length > keepCount) {
+				const recordsToDelete = historyRecords.slice(keepCount);
+				const idsToDelete = recordsToDelete.map((record) => record._id);
+
+				const deleteResult = await GiftHistory.deleteMany({
+					_id: { $in: idsToDelete },
+				});
+
+				logger.info(
+					`Cleaned up ${deleteResult.deletedCount} old history records for ${giftName}, keeping the latest ${keepCount}`
+				);
+			}
+		} catch (error) {
+			logger.error(`Error cleaning up old versions for ${giftName}: ${error}`);
+		}
 	}
 
 	public async updateGifts(): Promise<void> {
@@ -221,7 +294,22 @@ export class GiftService {
 		const startTime = new Date();
 
 		try {
-			const giftTypes = Object.entries(config.gifts.types);
+			let giftTypes: [string, string][] = [];
+			try {
+				const response = await axios.get(config.api.giftIdsUrl);
+
+				if (response.data && typeof response.data === "object") {
+					giftTypes = Object.entries(response.data);
+					logger.info(`Fetched ${giftTypes.length} gift types from API`);
+				} else {
+					logger.warning("Invalid response from gift IDs API, using defaults");
+					giftTypes = Object.entries(config.gifts.types);
+				}
+			} catch (error) {
+				logger.error(`Failed to fetch gift types from API: ${error}`);
+				giftTypes = Object.entries(config.gifts.types);
+			}
+
 			logger.info("Starting gift data update...");
 
 			const existingGifts = await Gift.find({});
@@ -238,14 +326,17 @@ export class GiftService {
 
 				const initialGift = await this.fetchGiftData(type, 1);
 				if (!initialGift) {
-					throw new Error(`Could not fetch initial gift data for ${type}`);
+					logger.warning(
+						`Could not fetch initial gift data for ${type}, skipping`
+					);
+					continue;
 				}
 
 				const totalIssued = initialGift.issued;
 				logger.info(`Found ${totalIssued} total gifts for ${type}`);
 
 				const giftData: GiftApiResponse[] = [];
-				const batchSize = 60;
+				const batchSize = 50;
 
 				for (let i = 1; i <= totalIssued; i += batchSize) {
 					const batchEnd = Math.min(i + batchSize - 1, totalIssued);
@@ -265,6 +356,14 @@ export class GiftService {
 					await sleep(1000);
 				}
 
+				const uniquePatterns = new Set<string>();
+				const uniqueBackdrops = new Set<string>();
+
+				giftData.forEach((gift) => {
+					if (gift.pattern) uniquePatterns.add(gift.pattern);
+					if (gift.backdrop) uniqueBackdrops.add(gift.backdrop);
+				});
+
 				const modelMap = await this.processGiftModel(type, giftData);
 				const giftModels = Array.from(modelMap.values());
 
@@ -276,11 +375,15 @@ export class GiftService {
 						total: initialGift.total,
 						modelsCount: giftModels.length,
 						models: giftModels,
+						availablePatterns: Array.from(uniquePatterns),
+						availableBackdrops: Array.from(uniqueBackdrops),
 						version: newVersion,
 						lastUpdated: new Date(),
 					},
 					{ upsert: true }
 				);
+
+				await this.cleanupOldVersions(type, 3);
 
 				logger.success(`✅ ${type} update complete`);
 			}
@@ -429,6 +532,8 @@ export class GiftService {
 						giftNumbers: [...owner.giftNumbers],
 						isHidden: owner.isHidden,
 						modelName: "",
+						pattern: owner.pattern,
+						backdrop: owner.backdrop,
 					});
 				}
 			});
@@ -517,6 +622,124 @@ export class GiftService {
 				totalUsers,
 			},
 			users: paginatedUsers,
+		};
+	}
+
+	public async getGiftPatterns(name: string): Promise<string[]> {
+		const gift = await Gift.findOne({ name });
+		if (!gift || !gift.availablePatterns) return [];
+		return gift.availablePatterns.sort((a, b) => a.localeCompare(b));
+	}
+
+	public async getGiftBackdrops(name: string): Promise<string[]> {
+		const gift = await Gift.findOne({ name });
+		if (!gift || !gift.availableBackdrops) return [];
+		return gift.availableBackdrops.sort((a, b) => a.localeCompare(b));
+	}
+
+	public async getGiftModelNames(name: string): Promise<string[]> {
+		const gift = await Gift.findOne({ name });
+		if (!gift) return [];
+
+		const modelNames = gift.models.map((model) => model.name);
+		return [...new Set(modelNames)].sort((a, b) => a.localeCompare(b));
+	}
+
+	public async searchGifts(params: {
+		name?: string;
+		model?: string;
+		pattern?: string;
+		backdrop?: string;
+		page?: number;
+		limit?: number;
+	}) {
+		const { name, model, pattern, backdrop, page = 1, limit = 20 } = params;
+
+		if (!name) {
+			return {
+				pagination: {
+					currentPage: page,
+					totalPages: 0,
+					limit,
+					totalItems: 0,
+				},
+				results: [],
+			};
+		}
+
+		const gift = await Gift.findOne({ name });
+		if (!gift) {
+			return {
+				pagination: {
+					currentPage: page,
+					totalPages: 0,
+					limit,
+					totalItems: 0,
+				},
+				results: [],
+			};
+		}
+
+		const results: Array<{
+			giftNumber: number;
+			owner: string;
+			username?: string;
+			model: string;
+			pattern: string;
+			backdrop: string;
+		}> = [];
+
+		for (const giftModel of gift.models) {
+			if (model && giftModel.name !== model) continue;
+
+			for (const owner of giftModel.owners) {
+				if (owner.giftDetails && owner.giftDetails.length > 0) {
+					for (const detail of owner.giftDetails) {
+						if (pattern && detail.pattern !== pattern) continue;
+						if (backdrop && detail.backdrop !== backdrop) continue;
+
+						results.push({
+							giftNumber: detail.number,
+							owner: owner.displayName,
+							username: owner.username,
+							model: giftModel.name,
+							pattern: detail.pattern,
+							backdrop: detail.backdrop,
+						});
+					}
+				} else {
+					if (pattern && owner.pattern !== pattern) continue;
+					if (backdrop && owner.backdrop !== backdrop) continue;
+
+					for (const giftNumber of owner.giftNumbers) {
+						results.push({
+							giftNumber,
+							owner: owner.displayName,
+							username: owner.username,
+							model: giftModel.name,
+							pattern: owner.pattern || "Unknown",
+							backdrop: owner.backdrop || "Unknown",
+						});
+					}
+				}
+			}
+		}
+
+		results.sort((a, b) => a.giftNumber - b.giftNumber);
+
+		const totalItems = results.length;
+		const totalPages = Math.ceil(totalItems / limit);
+		const startIndex = (page - 1) * limit;
+		const endIndex = page * limit;
+
+		return {
+			pagination: {
+				currentPage: page,
+				totalPages,
+				limit,
+				totalItems,
+			},
+			results: results.slice(startIndex, endIndex),
 		};
 	}
 }

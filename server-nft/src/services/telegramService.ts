@@ -72,8 +72,11 @@ export class TelegramService {
 					  }
 					: null,
 				ownerName: gift.ownerName,
+				ownerAddress: gift.ownerAddress,
 				num: number,
 				model: gift.model?.name || "",
+				pattern: gift.pattern.name,
+				backdrop: gift.backdrop.name,
 				slug: giftSlug,
 				issued: gift.raw.availabilityIssued || 0,
 				total: gift.raw.availabilityTotal || 0,

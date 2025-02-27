@@ -6,6 +6,13 @@ export class ImageUtils {
 	private static readonly BASE_URL = "https://cdn.changes.tg/gifts/models";
 
 	static formatGiftName(name: string): string {
+		if (name === "DurovsCap") {
+			return "Durov's Cap";
+		}
+		if (name === "BDayCandle") {
+			return "B-Day Candle";
+		}
+
 		return name.replace(/([A-Z])/g, " $1").trim();
 	}
 
@@ -14,19 +21,18 @@ export class ImageUtils {
 		modelName: string
 	): Promise<string | null> {
 		try {
-			// Проверяем, есть ли уже такое изображение
 			let imageId = await imageService.getImageByGiftAndModel(
 				giftName,
 				modelName
 			);
 
 			if (!imageId) {
-				// Если нет, скачиваем и сохраняем
 				const formattedGiftName = ImageUtils.formatGiftName(giftName);
 				const url = `${ImageUtils.BASE_URL}/${encodeURIComponent(
 					formattedGiftName
 				)}/png/${encodeURIComponent(modelName)}.png`;
 
+				logger.info(`Trying to download image from: ${url}`);
 				imageId = await imageService.saveImage(url, giftName, modelName);
 			}
 

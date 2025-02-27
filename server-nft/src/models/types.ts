@@ -6,8 +6,11 @@ export interface GiftApiResponse {
 		username: string | null;
 	} | null;
 	ownerName?: string | null;
+	ownerAddress?: string | null;
 	num: number;
 	model: string;
+	pattern: string;
+	backdrop: string;
 	slug: string;
 	issued: number;
 	total: number;
@@ -22,9 +25,18 @@ export interface IGiftOwner {
 	isHidden: boolean;
 	position?: number;
 	modelName?: string;
+	pattern?: string;
+	backdrop?: string;
+	blockchainAddress?: string;
 	models?: Array<{
 		name: string;
 		count: number;
+	}>;
+
+	giftDetails?: Array<{
+		number: number;
+		pattern: string;
+		backdrop: string;
 	}>;
 }
 
@@ -43,6 +55,8 @@ export interface IGift {
 	models: IGiftModel[];
 	version: number;
 	lastUpdated: Date;
+	availablePatterns: string[];
+	availableBackdrops: string[];
 }
 
 export interface IGiftHistory extends IGift {

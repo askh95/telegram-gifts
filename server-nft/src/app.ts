@@ -6,7 +6,6 @@ import { telegramService } from "./services/telegramService";
 import { startCronJobs } from "./cron";
 import { logger } from "./utils/logger";
 import cors from "cors";
-import path from "path";
 import { imageService } from "./services/image.service";
 
 console.log("CORS middleware loaded:", !!cors);
@@ -28,6 +27,25 @@ app.get("/api/nft/gifts", async (req: Request, res: Response) => {
 		res.json(gifts);
 	} catch (error) {
 		logger.error(`Error in /api/nft/gifts: ${error}`);
+		res.status(500).json({ error: "Internal server error" });
+	}
+});
+
+app.get("/api/nft/gifts/search", async (req: Request, res: Response) => {
+	try {
+		const params = {
+			name: req.query.name as string,
+			model: req.query.model as string,
+			pattern: req.query.pattern as string,
+			backdrop: req.query.backdrop as string,
+			page: req.query.page ? parseInt(req.query.page as string) : 1,
+			limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+		};
+
+		const results = await giftService.searchGifts(params);
+		res.json(results);
+	} catch (error) {
+		logger.error(`Error in /api/nft/gifts/search: ${error}`);
 		res.status(500).json({ error: "Internal server error" });
 	}
 });
@@ -203,6 +221,61 @@ app.get("/api/nft/users/top", async (req: Request, res: Response) => {
 	}
 });
 
+app.get("/api/nft/gifts/list", async (req: Request, res: Response) => {
+	try {
+		const gifts = await giftService.getGiftsList();
+		res.json(gifts);
+	} catch (error) {
+		logger.error(`Error in /api/nft/gifts/list: ${error}`);
+		res.status(500).json({ error: "Internal server error" });
+	}
+});
+
+app.get(
+	"/api/nft/gifts/:name/patterns",
+	async (req: Request, res: Response) => {
+		try {
+			const patterns = await giftService.getGiftPatterns(req.params.name);
+			res.json(patterns);
+		} catch (error) {
+			logger.error(
+				`Error in /api/nft/gifts/${req.params.name}/patterns: ${error}`
+			);
+			res.status(500).json({ error: "Internal server error" });
+		}
+	}
+);
+
+app.get(
+	"/api/nft/gifts/:name/backdrops",
+	async (req: Request, res: Response) => {
+		try {
+			const backdrops = await giftService.getGiftBackdrops(req.params.name);
+			res.json(backdrops);
+		} catch (error) {
+			logger.error(
+				`Error in /api/nft/gifts/${req.params.name}/backdrops: ${error}`
+			);
+			res.status(500).json({ error: "Internal server error" });
+		}
+	}
+);
+
+app.get(
+	"/api/nft/gifts/:name/model-names",
+	async (req: Request, res: Response) => {
+		try {
+			const modelNames = await giftService.getGiftModelNames(req.params.name);
+			res.json(modelNames);
+		} catch (error) {
+			logger.error(
+				`Error in /api/nft/gifts/${req.params.name}/model-names: ${error}`
+			);
+			res.status(500).json({ error: "Internal server error" });
+		}
+	}
+);
+
 const startServer = async (port: number): Promise<void> => {
 	try {
 		const server = app.listen(port);
@@ -224,7 +297,19 @@ const startServer = async (port: number): Promise<void> => {
 			logger.info(
 				"- GET /api/nft/gifts/:name/history - Get gift update history"
 			);
-			logger.info("- GET /api/nft/users/top - Get top users\n");
+			logger.info("- GET /api/nft/users/top - Get top users");
+
+			logger.info("- GET /api/nft/gifts/list - Get list of all gift names");
+			logger.info(
+				"- GET /api/nft/gifts/:name/patterns - Get patterns for a gift"
+			);
+			logger.info(
+				"- GET /api/nft/gifts/:name/backdrops - Get backdrops for a gift"
+			);
+			logger.info(
+				"- GET /api/nft/gifts/:name/model-names - Get model names for a gift"
+			);
+			logger.info("- GET /api/nft/gifts/search - Search gifts by parameters\n");
 		});
 
 		server.on("error", async (error: any) => {
