@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Menu, X, Gift, Star } from "lucide-react";
+import { Menu, X, Gift, Star, Heart } from "lucide-react";
 import Lottie from "lottie-react";
 import radarAnimation from "../assets/radar.json";
 
@@ -39,16 +39,6 @@ export const Navbar = () => {
 							<Gift className="h-5 w-5" />
 							Подарки
 						</NavLink>
-						{/* <NavLink
-							to="/monitor"
-							className="flex items-center gap-2 text-xl font-medium text-gray-300 transition-all duration-300 hover:scale-110 hover:text-blue-500"
-							style={({ isActive }) => ({
-								color: isActive ? "#3B82F6" : "",
-							})}
-						>
-							<Activity className="h-5 w-5" />
-							Мониторинг
-						</NavLink> */}
 						<NavLink
 							to="/nft"
 							className="flex items-center gap-2 text-xl font-medium text-gray-300 transition-all duration-300 hover:scale-110 hover:text-blue-500"
@@ -58,6 +48,16 @@ export const Navbar = () => {
 						>
 							<Star className="h-5 w-5" />
 							NFT
+						</NavLink>
+						<NavLink
+							to="/donate"
+							className="flex items-center gap-2 text-xl font-medium text-gray-300 transition-all duration-300 hover:scale-110 hover:text-purple-500"
+							style={({ isActive }) => ({
+								color: isActive ? "#8B5CF6" : "",
+							})}
+						>
+							<Heart className="h-5 w-5" />
+							Поддержать
 						</NavLink>
 						<a
 							href="https://t.me/peekNft"
@@ -107,16 +107,6 @@ export const Navbar = () => {
 								<Gift className="h-5 w-5" />
 								Подарки
 							</NavLink>
-							{/* <NavLink
-								to="/monitor"
-								className="flex items-center gap-2 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-blue-500"
-								style={({ isActive }) => ({
-									color: isActive ? "#3B82F6" : "",
-								})}
-							>
-								<Activity className="h-5 w-5" />
-								Мониторинг
-							</NavLink> */}
 							<NavLink
 								to="/nft"
 								className="flex items-center gap-2 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-blue-500"
@@ -127,6 +117,17 @@ export const Navbar = () => {
 							>
 								<Star className="h-5 w-5" />
 								NFT
+							</NavLink>
+							<NavLink
+								to="/donate"
+								className="flex items-center gap-2 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-purple-500"
+								style={({ isActive }) => ({
+									color: isActive ? "#8B5CF6" : "",
+								})}
+								onClick={toggleMobileMenu}
+							>
+								<Heart className="h-5 w-5" />
+								Поддержать
 							</NavLink>
 							<a
 								href="https://t.me/peekNft"

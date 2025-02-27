@@ -3,7 +3,11 @@ import { Copy } from "lucide-react";
 import type { CryptoAddress, CopySuccessMessage } from "../types/gift";
 import ton from "../assets/ton.png";
 
-const DonatePage = () => {
+interface DonatePageProps {
+	isModal?: boolean;
+}
+
+const DonatePage = ({ isModal = false }: DonatePageProps) => {
 	const [copySuccess, setCopySuccess] = useState<CopySuccessMessage>("");
 
 	const cryptoAddresses: CryptoAddress[] = [
@@ -31,29 +35,37 @@ const DonatePage = () => {
 		}
 	};
 
+	const containerClasses = isModal
+		? "mx-auto max-w-full"
+		: "mx-auto max-w-3xl px-4 py-12";
+
 	return (
-		<div className="bg-gray-900 text-white">
+		<div className="bg-transparent text-white">
 			{copySuccess && (
-				<div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 transform rounded-xl border border-white/20 bg-white/10 px-5 py-3.5 backdrop-blur-md">
+				<div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 transform rounded-xl border border-white/20 bg-white/10 px-4 sm:px-5 py-2.5 sm:py-3.5 backdrop-blur-md">
 					<div className="flex items-center gap-2">
-						<Copy className="h-5 w-5 text-emerald-400" />
-						<span className="font-medium">{copySuccess}</span>
+						<Copy className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+						<span className="text-sm sm:text-base font-medium">
+							{copySuccess}
+						</span>
 					</div>
 				</div>
 			)}
 
-			<div className="mx-auto max-w-3xl px-4 py-12">
-				<div className="mb-8 text-center">
-					<h1 className="mb-4 text-4xl font-bold sm:text-5xl">
-						<span className="text-white">Поддержать проект</span>
-					</h1>
-					<p className="mx-auto max-w-2xl text-gray-400">
-						Если вам нравится мой проект, вы можете поддержать его развитие.{" "}
-						<br /> Кстати, данный веб-сайт размещён на бесплатном хостинге, и
-						мне бы очень помогла ваша поддержка для его переноса на полноценный
-						сервер.
+			<div className={containerClasses}>
+				{!isModal && (
+					<div className="mb-8 text-center">
+						<h1 className="mb-4 text-3xl sm:text-4xl md:text-5xl font-bold">
+							<span className="text-white">Поддержать проект</span>
+						</h1>
+					</div>
+				)}
+
+				<div className="mb-6 text-center">
+					<p className="mx-auto max-w-2xl text-sm text-center sm:text-base text-gray-400">
+						Если вам нравится мой проект, вы можете поддержать его развитие.
 					</p>
-					<p className="mt-2 text-sm text-gray-500">
+					<p className="mt-2 text-xs sm:text-sm text-gray-500">
 						Нажмите на карточку чтобы скопировать адрес
 					</p>
 				</div>
@@ -67,21 +79,25 @@ const DonatePage = () => {
 								crypto.address &&
 								handleCopy(crypto.address, crypto.name)
 							}
-							className={`relative rounded-xl border p-8 transition-all duration-300
+							className={`relative rounded-xl border p-4 sm:p-6 md:p-8 transition-all duration-300
                 ${
 									crypto.special
 										? "border-[#0098c8]/20 bg-gradient-to-br from-[#0098c8]/10 to-[#0098c8]/5 hover:border-[#0098c8]/40 hover:bg-[#0098c8]/10 hover:shadow-[0_0_15px_rgba(0,152,200,0.15)]"
 										: "cursor-pointer border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 hover:shadow-lg"
 								}`}
 						>
-							<div className="flex items-center justify-between">
-								<div className="flex items-center gap-4">
+							<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+								<div className="flex items-center gap-3 sm:gap-4">
 									{crypto.name === "TON" ? (
-										<img src={ton} alt="TON" className="h-12 w-12" />
+										<img
+											src={ton}
+											alt="TON"
+											className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12"
+										/>
 									) : (
 										<svg
 											viewBox="0 0 24 24"
-											className="h-12 w-12"
+											className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12"
 											style={{ color: crypto.color }}
 										>
 											<path
@@ -90,10 +106,12 @@ const DonatePage = () => {
 											/>
 										</svg>
 									)}
-									<h2 className="text-2xl font-semibold">{crypto.name}</h2>
+									<h2 className="text-xl sm:text-2xl font-semibold">
+										{crypto.name}
+									</h2>
 								</div>
 								{!crypto.special && (
-									<Copy className="h-5 w-5 text-gray-400 transition-colors group-hover:text-white" />
+									<Copy className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 transition-colors group-hover:text-white" />
 								)}
 							</div>
 							{crypto.special ? (
@@ -101,23 +119,23 @@ const DonatePage = () => {
 									href="https://t.me/peekNft"
 									target="_blank"
 									rel="noopener noreferrer"
-									className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-[#0098c8] px-6 py-3 text-base text-white transition-all hover:bg-[#0098c8]/80 group"
+									className="mt-4 sm:mt-6 flex items-center justify-center gap-2 rounded-lg bg-[#0098c8] px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base text-white transition-all hover:bg-[#0098c8]/80 group"
 								>
 									<svg
 										stroke="currentColor"
 										fill="none"
 										strokeWidth="2"
 										viewBox="0 0 24 24"
-										className="h-5 w-5 transition-transform group-hover:scale-110"
+										className="h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:scale-110"
 										strokeLinecap="round"
 										strokeLinejoin="round"
 									>
 										<path d="M15 10l-4 4l6 6l4 -16l-18 7l4 2l2 6l3 -4" />
 									</svg>
-									<span>Открыть</span>
+									<span>Открыть канал</span>
 								</a>
 							) : (
-								<div className="mt-4 text-base text-gray-400 transition-colors group-hover:text-white">
+								<div className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-400 transition-colors group-hover:text-white">
 									{crypto.shortAddress}
 								</div>
 							)}
