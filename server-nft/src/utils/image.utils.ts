@@ -36,7 +36,7 @@ export class ImageUtils {
 				imageId = await imageService.saveImage(url, giftName, modelName);
 			}
 
-			return `/api/images/${imageId}`;
+			return imageId;
 		} catch (error) {
 			logger.error(
 				`Failed to process image for ${giftName} - ${modelName}: ${error}`

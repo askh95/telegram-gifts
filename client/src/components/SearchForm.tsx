@@ -1,3 +1,4 @@
+// Обновление src/components/SearchForm.tsx для добавления подсказки
 import { useMemo } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import {
@@ -30,6 +31,7 @@ import CustomDropdown from "./CustomDropdown";
 import BackdropCircle from "./BackdropCircle";
 import GiftIcon from "./GiftIcon";
 import PatternIcon from "./PatternIcon";
+import SearchSelectionHint from "./SearchSelectionHint";
 
 const SearchForm = () => {
 	const dispatch = useAppDispatch();
@@ -267,6 +269,13 @@ const SearchForm = () => {
 				</div>
 			</div>
 
+			<SearchSelectionHint
+				hasGift={selectedGift !== null}
+				hasModel={selectedModel !== null}
+				hasPattern={selectedPattern !== null}
+				hasBackdrop={selectedBackdrop !== null}
+			/>
+
 			<div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-auto pt-4 sm:pt-6 md:pt-8">
 				<button
 					onClick={handleReset}
@@ -291,11 +300,15 @@ const SearchForm = () => {
 				<button
 					onClick={handleSearch}
 					className={`order-1 sm:order-2 px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 shadow-lg flex-1 text-sm sm:text-base ${
-						!selectedGift
+						!selectedGift ||
+						(!selectedModel && !selectedPattern && !selectedBackdrop)
 							? "bg-blue-600/50 hover:bg-blue-600/60"
 							: "bg-blue-600 hover:bg-blue-700"
 					}`}
-					disabled={!selectedGift}
+					disabled={
+						!selectedGift ||
+						(!selectedModel && !selectedPattern && !selectedBackdrop)
+					}
 				>
 					<Search className="w-4 h-4 sm:w-5 sm:h-5" />
 					<span>Найти</span>

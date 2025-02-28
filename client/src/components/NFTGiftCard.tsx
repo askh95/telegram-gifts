@@ -4,7 +4,6 @@ import { Clock, Layers } from "lucide-react";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useUserTimezone } from "../hooks/useUserTimezone";
-import { useGetGiftModelsQuery } from "../store/api/nft";
 
 interface NFTGiftCardProps {
 	gift: NFTGift;
@@ -14,17 +13,6 @@ interface NFTGiftCardProps {
 export const NFTGiftCard = ({ gift, onClick }: NFTGiftCardProps) => {
 	const { offset } = useUserTimezone();
 	const percentComplete = (gift.issued / gift.total) * 100;
-
-	const { data: modelsData } = useGetGiftModelsQuery(
-		{
-			giftName: gift.name,
-			page: 1,
-			limit: 1,
-		},
-		{
-			skip: !gift.name,
-		}
-	);
 
 	const formatLastUpdated = (timestamp: string) => {
 		const date = dayjs.utc(timestamp);
@@ -55,20 +43,20 @@ export const NFTGiftCard = ({ gift, onClick }: NFTGiftCardProps) => {
     bg-gradient-to-b from-gray-700/50 to-gray-800/50 
     shadow-inner shadow-purple-500/5"
 					>
-						{modelsData?.models?.[0] ? (
-							<img
-								src={`${import.meta.env.VITE_NFT_API}/gifts/${
-									gift.name
-								}/models/${modelsData.models[0].name}/image`}
-								className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
-								onError={(e) => {
-									const target = e.target as HTMLImageElement;
-									target.style.display = "none";
-								}}
-							/>
-						) : (
-							<span className="text-5xl sm:text-6xl">🎁</span>
-						)}
+						<img
+							src={`${import.meta.env.VITE_NFT_API}/gifts/${
+								gift.name
+							}/default-model-image`}
+							className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
+							onError={(e) => {
+								const target = e.target as HTMLImageElement;
+								target.style.display = "none";
+								target.parentElement?.insertAdjacentHTML(
+									"beforeend",
+									`<span class="text-5xl sm:text-6xl">🎁</span>`
+								);
+							}}
+						/>
 					</div>
 					<div
 						className="absolute -top-2 -right-2 px-2.5 py-1 rounded-lg text-xs font-medium 

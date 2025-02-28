@@ -7,6 +7,7 @@ import { startCronJobs } from "./cron";
 import { logger } from "./utils/logger";
 import cors from "cors";
 import { imageService } from "./services/image.service";
+import { Gift } from "./models/gift.model";
 
 console.log("CORS middleware loaded:", !!cors);
 
@@ -134,21 +135,65 @@ app.get(
 	}
 );
 
-app.get("/api/images/:imageId", async (req: Request, res: Response) => {
-	try {
-		const result = await imageService.getImage(req.params.imageId);
+app.get(
+	"/api/nft/gifts/:giftName/default-model-image",
+	async (req: Request, res: Response) => {
+		try {
+			const giftName = req.params.giftName;
 
-		if (!result) {
-			return res.status(404).json({ error: "Image not found" });
+			const gift = await Gift.findOne({ name: giftName });
+
+			if (!gift || !gift.models || gift.models.length === 0) {
+				return res
+					.status(404)
+					.json({ error: "Gift not found or no models available" });
+			}
+
+			const firstModel = gift.models[0];
+			const modelName = firstModel.name;
+
+			if (firstModel.imageUrl) {
+				if (firstModel.imageUrl.startsWith("/api/images/")) {
+					const imageId = firstModel.imageUrl.replace("/api/images/", "");
+					const result = await imageService.getImage(imageId);
+
+					if (result) {
+						res.setHeader("Content-Type", result.contentType);
+						return result.stream.pipe(res);
+					}
+				}
+			}
+
+			const formattedGiftName = giftName.replace(/([A-Z])/g, " $1").trim();
+			const imageUrl = `https://cdn.changes.tg/gifts/models/${encodeURIComponent(
+				formattedGiftName
+			)}/png/${encodeURIComponent(modelName)}.png`;
+
+			const imageId = await imageService.saveImage(
+				imageUrl,
+				giftName,
+				modelName
+			);
+
+			if (!firstModel.imageUrl) {
+				await gift.save();
+			}
+
+			const result = await imageService.getImage(imageId);
+			if (!result) {
+				return res.status(404).json({ error: "Failed to load image" });
+			}
+
+			res.setHeader("Content-Type", result.contentType);
+			result.stream.pipe(res);
+		} catch (error) {
+			logger.error(
+				`Error in /api/nft/gifts/${req.params.giftName}/default-model-image: ${error}`
+			);
+			res.status(500).json({ error: "Internal server error" });
 		}
-
-		res.setHeader("Content-Type", result.contentType);
-		result.stream.pipe(res);
-	} catch (error) {
-		logger.error(`Error serving image: ${error}`);
-		res.status(500).json({ error: "Internal server error" });
 	}
-});
+);
 
 app.get(
 	"/api/nft/gifts/:name/models/:modelName",
@@ -198,19 +243,6 @@ app.get("/api/nft/gifts/:name/models", async (req: Request, res: Response) => {
 	}
 });
 
-app.get("/api/nft/gifts/:name/history", async (req: Request, res: Response) => {
-	try {
-		const limit = parseInt(req.query.limit as string) || 10;
-		const history = await giftService.getGiftHistory(req.params.name, limit);
-		res.json(history);
-	} catch (error) {
-		logger.error(
-			`Error in /api/nft/gifts/${req.params.name}/history: ${error}`
-		);
-		res.status(500).json({ error: "Internal server error" });
-	}
-});
-
 app.get("/api/nft/users/top", async (req: Request, res: Response) => {
 	try {
 		const page = parseInt(req.query.page as string) || 1;
@@ -220,16 +252,6 @@ app.get("/api/nft/users/top", async (req: Request, res: Response) => {
 		res.json(topUsers);
 	} catch (error) {
 		logger.error(`Error in /api/nft/users/top: ${error}`);
-		res.status(500).json({ error: "Internal server error" });
-	}
-});
-
-app.get("/api/nft/gifts/list", async (req: Request, res: Response) => {
-	try {
-		const gifts = await giftService.getGiftsList();
-		res.json(gifts);
-	} catch (error) {
-		logger.error(`Error in /api/nft/gifts/list: ${error}`);
 		res.status(500).json({ error: "Internal server error" });
 	}
 });

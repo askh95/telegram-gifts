@@ -7,7 +7,6 @@ import { sleep } from "../utils/helpers";
 import { telegramService } from "./telegramService";
 import mongoose from "mongoose";
 import { ImageUtils } from "../utils/image.utils";
-import { imageService } from "./image.service";
 import axios from "axios";
 
 export class GiftService {
@@ -456,7 +455,6 @@ export class GiftService {
 				(sum, owner) => sum + owner.giftsCount,
 				0
 			),
-			imageUrl: model.imageUrl,
 		}));
 
 		if (search) {
@@ -502,18 +500,11 @@ export class GiftService {
 		const startIndex = (page - 1) * limit;
 		const endIndex = page * limit;
 
-		const formattedGiftName = giftName.replace(/([A-Z])/g, " $1").trim();
-		const imageUrl = `https://cdn.changes.tg/gifts/models/${encodeURIComponent(
-			formattedGiftName
-		)}/png/${encodeURIComponent(modelName)}.png`;
-		const imageId = await imageService.saveImage(imageUrl, giftName, modelName);
-
 		return {
 			modelInfo: {
 				name: model.name,
 				ownersCount: model.ownersCount,
 				totalGifts: owners.reduce((sum, owner) => sum + owner.giftsCount, 0),
-				imageUrl: `/api/images/${imageId}`,
 			},
 			pagination: {
 				currentPage: page,

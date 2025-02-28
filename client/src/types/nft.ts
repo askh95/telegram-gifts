@@ -29,7 +29,6 @@ export interface Model {
 	name: string;
 	ownersCount: number;
 	totalGifts: number;
-	imageUrl?: string;
 }
 
 export interface ModelOwner extends Owner {
@@ -104,7 +103,7 @@ export interface PaginatedResponse<T> {
 	owners?: T[];
 	models?: T[];
 	users?: T[];
-	gifts?: T[]; // Добавлено новое поле для списка подарков
+	gifts?: T[];
 	modelInfo?: Model;
 	results?: T[];
 }
