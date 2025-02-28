@@ -57,11 +57,11 @@ const SearchForm = () => {
 	});
 
 	const giftOptions = useMemo(() => {
-		if (!giftsFromApi || !giftNames) return [];
-
-		return giftsFromApi.map((gift) => ({
+		// @ts-ignore
+		if (!giftsFromApi?.gifts || !giftNames) return [];
+		// @ts-ignore
+		return giftsFromApi.gifts.map((gift: any) => ({
 			value: gift.name,
-
 			label: giftNames[gift._id] || formatGiftName(gift.name),
 			icon: <GiftIcon giftName={gift.name} />,
 		}));
