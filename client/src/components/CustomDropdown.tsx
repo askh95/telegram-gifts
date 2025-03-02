@@ -206,7 +206,7 @@ const CustomDropdown = ({
 				<button
 					ref={buttonRef}
 					type="button"
-					className={`flex items-center justify-between w-full p-2 md:p-3 rounded-lg border text-left ${
+					className={`relative flex items-center justify-between w-full p-2 md:p-3 rounded-lg border text-left ${
 						disabled
 							? "bg-gray-700/50 text-gray-500 border-gray-700/30 cursor-not-allowed"
 							: "bg-gray-800/50 text-white border-gray-700/50 hover:bg-gray-700/60"
@@ -224,7 +224,7 @@ const CustomDropdown = ({
 										{selectedOption.icon}
 									</div>
 								)}
-								<span className="ml-2 text-sm sm:text-sm md:text-base truncate">
+								<span className="ml-0 sm:ml-2 text-xs sm:text-sm md:text-base truncate">
 									{getDisplayLabel(selectedOption)}
 								</span>
 							</>
@@ -349,9 +349,11 @@ const CustomDropdown = ({
 											aria-selected={option.value === value}
 										>
 											{option.icon && (
-												<div className="flex-shrink-0 block">{option.icon}</div>
+												<div className="flex-shrink-0 mr-3 sm:mr-3 w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
+													{option.icon}
+												</div>
 											)}
-											<span className="ml-1 text-xs sm:text-sm md:text-base truncate max-w-[70%]">
+											<span className="text-xs sm:text-sm md:text-base truncate max-w-[calc(100%-36px)]">
 												{option.value &&
 												!option.value.includes("-") &&
 												/[A-Z]/.test(option.value)
@@ -448,14 +450,14 @@ const CustomDropdown = ({
 					lockScroll={true}
 				>
 					<div
-						className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+						className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center py-16 px-4"
 						role="dialog"
 						aria-modal="true"
 						aria-labelledby="modal-title"
 					>
 						<div
 							ref={modalRef}
-							className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col animate-fadeIn"
+							className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col animate-fadeIn"
 							style={{
 								animation: "fadeIn 0.15s ease-out",
 							}}
@@ -494,7 +496,10 @@ const CustomDropdown = ({
 								</div>
 							)}
 
-							<div className="overflow-y-auto flex-grow">
+							<div
+								className="overflow-y-auto flex-grow"
+								style={{ maxHeight: "calc(100vh - 200px)" }}
+							>
 								{showAllOption && (
 									<div
 										className="flex items-center p-2.5 sm:p-3 border-b border-gray-700/20 cursor-pointer hover:bg-gray-700/40"
@@ -531,11 +536,11 @@ const CustomDropdown = ({
 											</div>
 											<div className="flex items-center flex-1">
 												{option.icon && (
-													<div className="mr-3 sm:mr-4 max-w-[20px] sm:max-w-none">
+													<div className="flex-shrink-0 mr-3 sm:mr-4 w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
 														{option.icon}
 													</div>
 												)}
-												<span className="truncate text-xs sm:text-sm max-w-[70%]">
+												<span className="truncate text-xs sm:text-sm max-w-[calc(100%-36px)]">
 													{option.value &&
 													!option.value.includes("-") &&
 													/[A-Z]/.test(option.value)
