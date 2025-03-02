@@ -12,11 +12,11 @@ export const config = {
 	},
 	gifts: {
 		types: {
-			"5936013938331222567": "PlushPepe",
 			"5936085638515261992": "SignetRing",
 			"5933671725160989227": "PreciousPeach",
 			"5915521180483191380": "DurovsCap",
 			"5868659926187901653": "LootBag",
+			"5915550639663874519": "LoveCandle",
 		},
 	},
 };

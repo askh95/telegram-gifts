@@ -364,12 +364,32 @@ const startup = async () => {
 		await imageService.init();
 		logger.success("ImageService initialized");
 
+		await giftService.init();
+		logger.success("GiftService initialized");
+
 		startCronJobs();
 		logger.info("Cron jobs started");
 
-		const needsUpdate = await giftService.shouldUpdate();
+		const newTypes = await giftService.checkForNewTypes();
+		let newTypesWereUpdated = false;
+
+		if (newTypes.length > 0) {
+			logger.info(
+				`Found ${newTypes.length} new gift types: ${newTypes.join(", ")}`
+			);
+			logger.info("Processing new gift types...");
+
+			for (const typeName of newTypes) {
+				await giftService.updateGiftType(typeName);
+			}
+
+			logger.success("New gift types processed successfully");
+			newTypesWereUpdated = true;
+		}
+
+		const needsUpdate = await giftService.shouldUpdate(newTypesWereUpdated);
 		if (needsUpdate) {
-			logger.info("Initial data fetch required...");
+			logger.info("Regular data update required...");
 			await giftService.updateGifts();
 		} else {
 			logger.info("Using existing data, next update will be triggered by cron");

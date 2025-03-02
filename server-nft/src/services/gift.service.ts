@@ -12,6 +12,7 @@ import axios from "axios";
 export class GiftService {
 	private static instance: GiftService;
 	private isUpdating: boolean = false;
+	private knownTypes: Set<string> = new Set();
 
 	private constructor() {}
 
@@ -20,6 +21,174 @@ export class GiftService {
 			GiftService.instance = new GiftService();
 		}
 		return GiftService.instance;
+	}
+
+	public async init(): Promise<void> {
+		await this.loadKnownTypes();
+		logger.info(
+			`Loaded ${this.knownTypes.size} known gift types from database`
+		);
+	}
+
+	private async loadKnownTypes(): Promise<void> {
+		const types = await Gift.distinct("name");
+		this.knownTypes = new Set(types);
+	}
+
+	public async checkForNewTypes(): Promise<string[]> {
+		const configTypes = Object.values(config.gifts.types);
+
+		if (this.knownTypes.size === 0) {
+			await this.loadKnownTypes();
+		}
+
+		const newTypes = configTypes.filter((type) => !this.knownTypes.has(type));
+
+		return newTypes;
+	}
+
+	private getTypeIdByName(typeName: string): string | null {
+		const entry = Object.entries(config.gifts.types).find(
+			([_, name]) => name === typeName
+		);
+
+		return entry ? entry[0] : null;
+	}
+
+	public async updateGiftType(typeName: string): Promise<void> {
+		if (this.isUpdating) {
+			logger.warning(
+				`Update already in progress, skipping update for ${typeName}...`
+			);
+			return;
+		}
+
+		const typeId = this.getTypeIdByName(typeName);
+		if (!typeId) {
+			logger.error(`Cannot find type ID for ${typeName}`);
+			return;
+		}
+
+		this.isUpdating = true;
+		const newVersion = Date.now();
+
+		try {
+			logger.info(`🎁 Starting update for new gift type: ${typeName}`);
+
+			const existingGift = await Gift.findOne({ name: typeName });
+			if (existingGift) {
+				const historyRecord = {
+					...existingGift.toObject(),
+					_id: new mongoose.Types.ObjectId(),
+					version: existingGift.version || 1,
+					replacedAt: new Date(),
+					replacedBy: newVersion,
+				};
+				await GiftHistory.create(historyRecord);
+				logger.info(`Archived existing version of ${typeName} to history`);
+			}
+
+			const initialGift = await this.fetchGiftData(typeName, 1);
+			if (!initialGift) {
+				logger.warning(
+					`Could not fetch initial gift data for ${typeName}, skipping`
+				);
+				this.isUpdating = false;
+				return;
+			}
+
+			const totalIssued = initialGift.issued;
+			logger.info(`Found ${totalIssued} total gifts for ${typeName}`);
+
+			const giftData: GiftApiResponse[] = [];
+			const batchSize = 50;
+
+			for (let i = 1; i <= totalIssued; i += batchSize) {
+				const batchEnd = Math.min(i + batchSize - 1, totalIssued);
+				logger.progress(i, totalIssued, `Processing ${typeName} batch`);
+
+				const promises = Array.from({ length: batchEnd - i + 1 }, (_, index) =>
+					this.fetchGiftData(typeName, i + index)
+				);
+
+				const batchResults = await Promise.all(promises);
+				const validResults = batchResults.filter(
+					(gift): gift is GiftApiResponse => gift !== null
+				);
+
+				giftData.push(...validResults);
+				await sleep(1000);
+			}
+
+			const uniquePatterns = new Set<string>();
+			const uniqueBackdrops = new Set<string>();
+
+			giftData.forEach((gift) => {
+				if (gift.pattern) uniquePatterns.add(gift.pattern);
+				if (gift.backdrop) uniqueBackdrops.add(gift.backdrop);
+			});
+
+			const modelMap = await this.processGiftModel(typeName, giftData);
+			const giftModels = Array.from(modelMap.values());
+
+			await Gift.findOneAndUpdate(
+				{ name: typeName },
+				{
+					name: typeName,
+					issued: totalIssued,
+					total: initialGift.total,
+					modelsCount: giftModels.length,
+					models: giftModels,
+					availablePatterns: Array.from(uniquePatterns),
+					availableBackdrops: Array.from(uniqueBackdrops),
+					version: newVersion,
+					lastUpdated: new Date(),
+				},
+				{ upsert: true }
+			);
+
+			await this.cleanupOldVersions(typeName, 3);
+
+			this.knownTypes.add(typeName);
+
+			logger.success(`✅ ${typeName} update complete`);
+		} catch (error) {
+			logger.error(`Error updating gift type ${typeName}: ${error}`);
+		} finally {
+			this.isUpdating = false;
+		}
+	}
+
+	public async shouldUpdate(
+		skipAfterNewTypeUpdate: boolean = false
+	): Promise<boolean> {
+		const newTypes = await this.checkForNewTypes();
+		if (newTypes.length > 0) {
+			logger.info(
+				`Found ${newTypes.length} new gift types: ${newTypes.join(", ")}`
+			);
+			return true;
+		}
+
+		if (skipAfterNewTypeUpdate) {
+			logger.info("Skipping full update since new types were just updated");
+			return false;
+		}
+
+		const latestGift = await Gift.findOne(
+			{},
+			{},
+			{ sort: { lastUpdated: -1 } }
+		);
+
+		if (!latestGift) {
+			return true;
+		}
+
+		const timeSinceLastUpdate = Date.now() - latestGift.lastUpdated.getTime();
+		const updateIntervalMs = 24 * 60 * 60 * 1000;
+
+		return timeSinceLastUpdate > updateIntervalMs;
 	}
 
 	private async fetchGiftData(
@@ -133,6 +302,7 @@ export class GiftService {
 
 		return Array.from(ownerMap.values());
 	}
+
 	private async processGiftModel(
 		giftType: string,
 		giftData: GiftApiResponse[]
@@ -239,23 +409,6 @@ export class GiftService {
 		}
 	}
 
-	public async shouldUpdate(): Promise<boolean> {
-		const latestGift = await Gift.findOne(
-			{},
-			{},
-			{ sort: { lastUpdated: -1 } }
-		);
-
-		if (!latestGift) {
-			return true;
-		}
-
-		const timeSinceLastUpdate = Date.now() - latestGift.lastUpdated.getTime();
-		const updateIntervalMs = 24 * 60 * 60 * 1000;
-
-		return timeSinceLastUpdate > updateIntervalMs;
-	}
-
 	private async cleanupOldVersions(
 		giftName: string,
 		keepCount: number = 3
@@ -282,7 +435,7 @@ export class GiftService {
 		}
 	}
 
-	public async updateGifts(): Promise<void> {
+	public async updateGifts(skipRecentlyUpdated: boolean = true): Promise<void> {
 		if (this.isUpdating) {
 			logger.warning("Update already in progress, skipping...");
 			return;
@@ -291,8 +444,30 @@ export class GiftService {
 		this.isUpdating = true;
 		const newVersion = Date.now();
 		const startTime = new Date();
+		const recentlyUpdatedTypes = new Set<string>();
 
 		try {
+			const newTypes = await this.checkForNewTypes();
+			if (newTypes.length > 0) {
+				logger.info(
+					`Found ${newTypes.length} new gift types: ${newTypes.join(", ")}`
+				);
+
+				for (const typeName of newTypes) {
+					const typeId = this.getTypeIdByName(typeName);
+					if (!typeId) {
+						logger.warning(
+							`Could not find ID for new type: ${typeName}, skipping`
+						);
+						continue;
+					}
+
+					await this.updateGiftType(typeName);
+					this.knownTypes.add(typeName);
+					recentlyUpdatedTypes.add(typeName);
+				}
+			}
+
 			let giftTypes: [string, string][] = [];
 			try {
 				const response = await axios.get(config.api.giftIdsUrl);
@@ -309,14 +484,23 @@ export class GiftService {
 				giftTypes = Object.entries(config.gifts.types);
 			}
 
-			logger.info("Starting gift data update...");
+			logger.info("Starting regular gift data update for all types...");
 
 			const existingGifts = await Gift.find({});
 			if (existingGifts.length > 0) {
 				await this.archiveCurrentVersion(newVersion);
 			}
 
+			if (!skipRecentlyUpdated) {
+				recentlyUpdatedTypes.clear();
+			}
+
 			for (const [id, type] of giftTypes) {
+				if (recentlyUpdatedTypes.has(type)) {
+					logger.info(`Skipping ${type} as it was recently updated`);
+					continue;
+				}
+
 				logger.info(
 					`🎁 Updating ${type} (${giftTypes.indexOf([id, type]) + 1}/${
 						giftTypes.length
@@ -383,6 +567,8 @@ export class GiftService {
 				);
 
 				await this.cleanupOldVersions(type, 3);
+
+				this.knownTypes.add(type);
 
 				logger.success(`✅ ${type} update complete`);
 			}
