@@ -55,7 +55,6 @@ const SearchResults = () => {
 
 				setAllResults(searchResults.results);
 			} else {
-				// Если мы загрузили страницу > 1, устанавливаем флаг
 				setLoadedMoreThanOnePage(true);
 
 				const newUniqueResults = searchResults.results.filter((result) => {
@@ -217,7 +216,7 @@ const SearchResults = () => {
 	) {
 		return (
 			<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-4 md:p-6 shadow-lg border border-gray-700/50 mb-6">
-				<div className="text-center text-gray-400 py-6">
+				<div className="text-xs md:text-lg text-center text-gray-400 py-6">
 					По вашему запросу ничего не найдено
 				</div>
 			</div>
@@ -230,8 +229,10 @@ const SearchResults = () => {
 			className="bg-gray-800/50 backdrop-blur-sm rounded-xl xl:rounded-3xl p-4 md:p-6 shadow-lg border border-gray-700/50 mb-6 transition-all duration-300"
 		>
 			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-				<h2 className="text-xl font-bold text-white">Результаты поиска</h2>
-				<div className="text-sm text-gray-400 flex items-center gap-3">
+				<h2 className="text-base md:text-xl font-bold text-white">
+					Результаты поиска
+				</h2>
+				<div className="text-xs md:text-sm text-gray-400 flex items-center gap-3">
 					{searchResults && (
 						<>
 							<span>Найдено: {searchResults.pagination.totalItems}</span>
@@ -343,13 +344,13 @@ const SearchResults = () => {
 									href={`https://t.me/nft/${searchQuery.name}-${result.giftNumber}`}
 									target="_blank"
 									rel="noopener noreferrer"
-									className="text-blue-400 text-lg font-medium hover:text-blue-300 hover:underline"
+									className="text-blue-400 text-base font-medium hover:text-blue-300 hover:underline"
 								>
 									{result.giftNumber}
 								</a>
 							</div>
 
-							<div className="grid grid-cols-1 gap-2">
+							<div className="grid grid-cols-1 gap-2 text-xs">
 								<div className="flex justify-between">
 									<span className="text-gray-400">Владелец:</span>
 									<span className="text-white text-right">

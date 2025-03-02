@@ -29,9 +29,8 @@ const SearchSelectionHint = ({
 			</div>
 			<div className="text-blue-300 text-xs lg:text-sm ">
 				<p>
-					Выберите хотя бы один из параметров{" "}
-					<i className="text-blue-400">(Модель, Фон или Узор)</i> для поиска и
-					визуализации.
+					Для визуализации подарка выберите{" "}
+					<i className="text-blue-400">Модель, Фон или Узор</i>
 				</p>
 			</div>
 			<style>{`

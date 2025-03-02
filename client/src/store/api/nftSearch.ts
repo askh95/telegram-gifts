@@ -1,6 +1,6 @@
 // src/store/api/nftSearch.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import type { NFTGift, GiftBackdrop, SearchResults } from "../../types/nft";
+import type { GiftBackdrop, SearchResults } from "../../types/nft";
 import { formatGiftName } from "../../utils/formatGiftName";
 
 const BASE_URL = import.meta.env.VITE_NFT_API;
@@ -11,11 +11,6 @@ export const nftSearchApi = createApi({
 	baseQuery: fetchBaseQuery({ baseUrl: BASE_URL }),
 	tagTypes: ["NFTGifts", "Patterns", "Backdrops", "Models", "SearchResults"],
 	endpoints: (builder) => ({
-		getNFTGifts: builder.query<NFTGift[], void>({
-			query: () => "gifts",
-			providesTags: ["NFTGifts"],
-		}),
-
 		getGiftPatterns: builder.query<string[], string>({
 			query: (giftName) => `gifts/${giftName}/patterns`,
 			providesTags: (_, __, giftName) => [{ type: "Patterns", id: giftName }],
@@ -141,7 +136,6 @@ export const nftSearchApi = createApi({
 });
 
 export const {
-	useGetNFTGiftsQuery,
 	useGetGiftPatternsQuery,
 	useGetGiftBackdropsQuery,
 	useGetGiftModelNamesQuery,

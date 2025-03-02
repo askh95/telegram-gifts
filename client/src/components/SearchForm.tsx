@@ -17,13 +17,15 @@ import {
 	setBackdropData,
 } from "../store/slices/nftVisualizerSlice";
 import {
-	useGetNFTGiftsQuery,
 	useGetGiftModelNamesQuery,
 	useGetGiftPatternsQuery,
 	useGetGiftBackdropsQuery,
 	useGetGiftNamesFromCDNQuery,
 	useGetBackdropDataQuery,
 } from "../store/api/nftSearch";
+
+import { useGetNFTGiftsQuery } from "../store/api/nft";
+
 import { formatGiftName } from "../utils/formatGiftName";
 
 import { Search } from "lucide-react";
@@ -41,8 +43,9 @@ const SearchForm = () => {
 	const selectedPattern = useAppSelector(selectPattern);
 	const selectedBackdrop = useAppSelector(selectBackdrop);
 
-	const { data: giftsFromApi, isLoading: isGiftsLoading } =
-		useGetNFTGiftsQuery();
+	const { data: giftsFromApi, isLoading: isGiftsLoading } = useGetNFTGiftsQuery(
+		{ page: 1, limit: 1000 }
+	);
 	const { data: giftNames } = useGetGiftNamesFromCDNQuery();
 
 	const { data: modelNames, isLoading: isModelsLoading } =
@@ -117,7 +120,7 @@ const SearchForm = () => {
 					<BackdropCircle
 						centerColor={centerColor}
 						edgeColor={edgeColor}
-						size="medium"
+						size="small"
 					/>
 				),
 			};
@@ -188,14 +191,14 @@ const SearchForm = () => {
 	};
 
 	return (
-		<div className="h-full w-full flex flex-col p-6 sm:p-4 md:p-6">
-			<h2 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 md:mb-6">
+		<div className="h-full w-full flex flex-col p-1 sm:p-4 md:p-6">
+			<h2 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 md:mb-6 hidden md:block">
 				Поиск NFT
 			</h2>
 
-			<div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 md:gap-x-4 gap-y-3 sm:gap-y-4 md:gap-y-5">
+			<div className="grid grid-cols-2 gap-x-3 md:gap-x-4 gap-y-3 sm:gap-y-4 md:gap-y-5">
 				<div>
-					<label className="block text-gray-300 text-xs sm:text-sm font-medium mb-1 sm:mb-2">
+					<label className="block text-gray-300 text-xs md:text-sm font-normal md:font-medium mb-1 sm:mb-2">
 						Подарок
 					</label>
 					<CustomDropdown
@@ -212,7 +215,7 @@ const SearchForm = () => {
 				</div>
 
 				<div>
-					<label className="block text-gray-300 text-xs sm:text-sm font-medium mb-1 sm:mb-2">
+					<label className="block text-gray-300 text-xs md:text-sm font-normal md:font-medium mb-1 sm:mb-2">
 						Модель
 					</label>
 					<CustomDropdown
@@ -231,7 +234,7 @@ const SearchForm = () => {
 				</div>
 
 				<div>
-					<label className="block text-gray-300 text-xs sm:text-sm font-medium mb-1 sm:mb-2">
+					<label className="block text-gray-300 text-xs md:text-sm font-normal md:font-medium mb-1 sm:mb-2">
 						Фон
 					</label>
 					<CustomDropdown
@@ -250,7 +253,7 @@ const SearchForm = () => {
 				</div>
 
 				<div>
-					<label className="block text-gray-300 text-xs sm:text-sm font-medium mb-1 sm:mb-2">
+					<label className="block text-gray-300 text-xs md:text-sm font-normal md:font-medium mb-1 sm:mb-2">
 						Узор
 					</label>
 					<CustomDropdown
@@ -276,10 +279,10 @@ const SearchForm = () => {
 				hasBackdrop={selectedBackdrop !== null}
 			/>
 
-			<div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-auto pt-4 sm:pt-6 md:pt-8">
+			<div className="flex flex-row gap-2 md:gap-3 mt-auto pt-4 sm:pt-6 md:pt-8">
 				<button
 					onClick={handleReset}
-					className="order-2 sm:order-1 px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-700/30 text-gray-300 rounded-lg hover:bg-gray-700/50 transition-all duration-200 flex items-center justify-center gap-2 flex-1 text-sm sm:text-base"
+					className="order-1 px-3 py-2.5 md:px-4 md:py-3 bg-gray-700/30 text-gray-300 rounded-lg hover:bg-gray-700/50 transition-all duration-200 flex items-center justify-center gap-2 flex-1 text-xs md:text-base"
 				>
 					<svg
 						className="w-4 h-4 sm:w-5 sm:h-5"
@@ -299,18 +302,14 @@ const SearchForm = () => {
 
 				<button
 					onClick={handleSearch}
-					className={`order-1 sm:order-2 px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 shadow-lg flex-1 text-sm sm:text-base ${
-						!selectedGift ||
-						(!selectedModel && !selectedPattern && !selectedBackdrop)
+					className={`order-2 px-4 py-2.5 md:px-6 md:py-3 rounded-lg cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 shadow-lg flex-1 text-xs md:text-base ${
+						!selectedGift
 							? "bg-blue-600/50 hover:bg-blue-600/60"
 							: "bg-blue-600 hover:bg-blue-700"
 					}`}
-					disabled={
-						!selectedGift ||
-						(!selectedModel && !selectedPattern && !selectedBackdrop)
-					}
+					disabled={!selectedGift}
 				>
-					<Search className="w-4 h-4 sm:w-5 sm:h-5" />
+					<Search className="w-4 h-4 md:w-5 md:h-5" />
 					<span>Найти</span>
 				</button>
 			</div>

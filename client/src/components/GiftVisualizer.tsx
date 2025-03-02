@@ -162,7 +162,7 @@ const GiftVisualizer = () => {
 		return (
 			<div className="w-full h-full flex items-center justify-center">
 				<div className="text-center p-6">
-					<div className="text-gray-500 text-lg">
+					<div className="text-gray-500 md:text-lg sm:text-base text-sm">
 						Выберите подарок для предпросмотра
 					</div>
 				</div>

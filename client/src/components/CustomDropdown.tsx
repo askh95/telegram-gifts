@@ -77,14 +77,6 @@ const CustomDropdown = ({
 	}, []);
 
 	useEffect(() => {
-		if (useVisualMode && isOpen) {
-			document.body.style.overflow = "hidden";
-		} else {
-			document.body.style.overflow = "";
-		}
-	}, [isOpen]);
-
-	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
 			if (visualModeOnMobile && isMobile) {
 				if (
@@ -232,12 +224,12 @@ const CustomDropdown = ({
 										{selectedOption.icon}
 									</div>
 								)}
-								<span className="ml-0 sm:ml-2 text-sm md:text-base truncate">
+								<span className="ml-2 text-sm sm:text-sm md:text-base truncate">
 									{getDisplayLabel(selectedOption)}
 								</span>
 							</>
 						) : (
-							<span className="text-gray-400 text-sm md:text-base">
+							<span className="text-gray-400 text-xs sm:text-sm md:text-base">
 								{placeholder}
 							</span>
 						)}
@@ -245,7 +237,7 @@ const CustomDropdown = ({
 					<div className="flex items-center">
 						{loading ? (
 							<svg
-								className="w-4 h-4 md:w-5 md:h-5 text-gray-400 animate-spin"
+								className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-gray-400 animate-spin"
 								xmlns="http://www.w3.org/2000/svg"
 								fill="none"
 								viewBox="0 0 24 24"
@@ -266,7 +258,7 @@ const CustomDropdown = ({
 							</svg>
 						) : (
 							<svg
-								className="w-3 h-3 md:w-4 md:h-4 text-gray-400"
+								className="w-2 h-2 sm:w-3 sm:h-3 md:w-4 md:h-4 text-gray-400"
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
@@ -283,7 +275,10 @@ const CustomDropdown = ({
 				</button>
 
 				{isOpen && (
-					<Portal wrapperId={`dropdown-portal-${title || placeholder}`}>
+					<Portal
+						wrapperId={`dropdown-portal-${title || placeholder}`}
+						lockScroll={false}
+					>
 						<div
 							ref={dropdownRef}
 							className={`bg-gray-800 border border-gray-700 rounded-lg shadow-lg overflow-hidden z-50 max-w-[calc(100vw-2rem)] ${
@@ -311,9 +306,9 @@ const CustomDropdown = ({
 											value={searchQuery}
 											onChange={handleSearchChange}
 											placeholder="Поиск..."
-											className="w-full bg-gray-700/40 border border-gray-600/50 rounded-md py-1.5 md:py-2 pl-7 md:pl-8 pr-2 md:pr-3 text-xs md:text-sm text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+											className="w-full bg-gray-700/40 border border-gray-600/50 rounded-md py-1.5 md:py-2 pl-6 sm:pl-7 md:pl-8 pr-2 md:pr-3 text-xs sm:text-xs md:text-sm text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
 										/>
-										<Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 md:w-4 md:h-4 text-gray-400" />
+										<Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4 text-gray-400" />
 									</div>
 								</div>
 							)}
@@ -332,14 +327,14 @@ const CustomDropdown = ({
 										role="option"
 										aria-selected={value === null}
 									>
-										<span className="ml-2 text-sm md:text-base">
+										<span className="ml-2 text-xs sm:text-sm md:text-base">
 											{allOptionLabel}
 										</span>
 									</div>
 								)}
 
 								{filteredOptions.length === 0 ? (
-									<div className="p-2 md:p-3 text-gray-400 text-center text-sm">
+									<div className="p-2 md:p-3 text-gray-400 text-center text-xs sm:text-sm">
 										{noOptionsMessage}
 									</div>
 								) : (
@@ -354,11 +349,9 @@ const CustomDropdown = ({
 											aria-selected={option.value === value}
 										>
 											{option.icon && (
-												<div className="flex-shrink-0 hidden sm:block">
-													{option.icon}
-												</div>
+												<div className="flex-shrink-0 block">{option.icon}</div>
 											)}
-											<span className="ml-0 sm:ml-2 text-sm md:text-base truncate">
+											<span className="ml-1 text-xs sm:text-sm md:text-base truncate max-w-[70%]">
 												{option.value &&
 												!option.value.includes("-") &&
 												/[A-Z]/.test(option.value)
@@ -395,14 +388,16 @@ const CustomDropdown = ({
 					{selectedOption ? (
 						<>
 							{selectedOption.icon && (
-								<div className="flex-shrink-0 block">{selectedOption.icon}</div>
+								<div className="flex-shrink-0 block max-w-[20px] sm:max-w-none">
+									{selectedOption.icon}
+								</div>
 							)}
-							<span className="ml-2 text-sm md:text-base truncate">
+							<span className="ml-3 sm:ml-3 text-xs sm:text-sm md:text-base truncate max-w-[70%]">
 								{getDisplayLabel(selectedOption)}
 							</span>
 						</>
 					) : (
-						<span className="text-gray-400 text-sm md:text-base">
+						<span className="text-gray-400 text-xs sm:text-sm md:text-base">
 							{placeholder}
 						</span>
 					)}
@@ -410,7 +405,7 @@ const CustomDropdown = ({
 				<div className="flex items-center">
 					{loading ? (
 						<svg
-							className="w-4 h-4 md:w-5 md:h-5 text-gray-400 animate-spin"
+							className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-gray-400 animate-spin"
 							xmlns="http://www.w3.org/2000/svg"
 							fill="none"
 							viewBox="0 0 24 24"
@@ -431,7 +426,7 @@ const CustomDropdown = ({
 						</svg>
 					) : (
 						<svg
-							className="w-3 h-3 md:w-4 md:h-4 text-gray-400"
+							className="w-2 h-2 sm:w-3 sm:h-3 md:w-4 md:h-4 text-gray-400"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -448,7 +443,10 @@ const CustomDropdown = ({
 			</button>
 
 			{isOpen && (
-				<Portal wrapperId={`modal-dropdown-${title || placeholder}`}>
+				<Portal
+					wrapperId={`modal-dropdown-${title || placeholder}`}
+					lockScroll={true}
+				>
 					<div
 						className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
 						role="dialog"
@@ -462,10 +460,10 @@ const CustomDropdown = ({
 								animation: "fadeIn 0.15s ease-out",
 							}}
 						>
-							<div className="flex items-center justify-between p-4 border-b border-gray-700">
+							<div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-700">
 								<h2
 									id="modal-title"
-									className="text-lg font-semibold text-white"
+									className="text-base sm:text-lg font-semibold text-white"
 								>
 									{title || placeholder}
 								</h2>
@@ -476,7 +474,7 @@ const CustomDropdown = ({
 									}}
 									className="text-gray-400 hover:text-white transition-colors"
 								>
-									<X className="w-5 h-5" />
+									<X className="w-4 h-4 sm:w-5 sm:h-5" />
 								</button>
 							</div>
 
@@ -489,9 +487,9 @@ const CustomDropdown = ({
 											value={searchQuery}
 											onChange={handleSearchChange}
 											placeholder="Поиск..."
-											className="w-full bg-gray-700/40 border border-gray-600/50 rounded-md py-2 pl-8 pr-3 text-sm text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+											className="w-full bg-gray-700/40 border border-gray-600/50 rounded-md py-1.5 sm:py-2 pl-7 sm:pl-8 pr-2 sm:pr-3 text-xs sm:text-sm text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
 										/>
-										<Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+										<Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
 									</div>
 								</div>
 							)}
@@ -499,43 +497,45 @@ const CustomDropdown = ({
 							<div className="overflow-y-auto flex-grow">
 								{showAllOption && (
 									<div
-										className="flex items-center p-3 border-b border-gray-700/20 cursor-pointer hover:bg-gray-700/40"
+										className="flex items-center p-2.5 sm:p-3 border-b border-gray-700/20 cursor-pointer hover:bg-gray-700/40"
 										onClick={() => {
 											onChange(null);
 											setIsOpen(false);
 											setSearchQuery("");
 										}}
 									>
-										<div className="flex items-center justify-center w-5 h-5 rounded border border-gray-500 mr-3 flex-shrink-0">
+										<div className="flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded border border-gray-500 mr-2 sm:mr-3 flex-shrink-0">
 											{value === null && (
-												<div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
+												<div className="w-2 h-2 sm:w-3 sm:h-3 bg-blue-500 rounded-sm"></div>
 											)}
 										</div>
-										<span>{allOptionLabel}</span>
+										<span className="text-xs sm:text-sm">{allOptionLabel}</span>
 									</div>
 								)}
 
 								{filteredOptions.length === 0 ? (
-									<div className="p-4 text-gray-400 text-center">
+									<div className="p-3 sm:p-4 text-gray-400 text-center text-xs sm:text-sm">
 										{noOptionsMessage}
 									</div>
 								) : (
 									filteredOptions.map((option) => (
 										<div
 											key={option.value}
-											className="flex items-center p-3 border-b border-gray-700/20 cursor-pointer hover:bg-gray-700/40"
+											className="flex items-center p-2.5 sm:p-3 border-b border-gray-700/20 cursor-pointer hover:bg-gray-700/40"
 											onClick={() => handleOptionClick(option)}
 										>
-											<div className="flex items-center justify-center w-5 h-5 rounded border border-gray-500 mr-3 flex-shrink-0">
+											<div className="flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded border border-gray-500 mr-2 sm:mr-3 flex-shrink-0">
 												{option.value === value && (
-													<div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
+													<div className="w-2 h-2 sm:w-3 sm:h-3 bg-blue-500 rounded-sm"></div>
 												)}
 											</div>
 											<div className="flex items-center flex-1">
 												{option.icon && (
-													<div className="mr-3">{option.icon}</div>
+													<div className="mr-3 sm:mr-4 max-w-[20px] sm:max-w-none">
+														{option.icon}
+													</div>
 												)}
-												<span className="truncate">
+												<span className="truncate text-xs sm:text-sm max-w-[70%]">
 													{option.value &&
 													!option.value.includes("-") &&
 													/[A-Z]/.test(option.value)
