@@ -416,7 +416,7 @@ const SearchResults = () => {
 			>
 				{isFetching || isLoadingMore ? (
 					<div className="flex items-center gap-3 text-gray-300 py-2">
-						<Loader className="w-5 h-5 text-blue-500 animate-spin" />
+						<Loader className="w-3 h-3 md:w-5 md:h-5 text-blue-500 animate-spin" />
 						<span>Загрузка...</span>
 					</div>
 				) : hasMore ? (
