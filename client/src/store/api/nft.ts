@@ -22,7 +22,7 @@ export const nftApi = createApi({
 			query: (params) => ({
 				url: "gifts",
 				params: params
-					? { page: params.page || 1, limit: params.limit || 20 }
+					? { page: params.page || 1, limit: params.limit || 5 }
 					: {},
 			}),
 			providesTags: ["NFTGifts"],

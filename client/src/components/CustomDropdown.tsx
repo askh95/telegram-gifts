@@ -536,7 +536,7 @@ const CustomDropdown = ({
 											</div>
 											<div className="flex items-center flex-1">
 												{option.icon && (
-													<div className="flex-shrink-0 mr-3 sm:mr-4 w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
+													<div className="flex-shrink-0 mr-3  flex items-center justify-center">
 														{option.icon}
 													</div>
 												)}
