@@ -23,7 +23,7 @@ export const NFTGiftList = () => {
 		refetch,
 	} = useGetNFTGiftsQuery({
 		page: currentPage,
-		limit: 5,
+		limit: 10,
 	});
 
 	useEffect(() => {
