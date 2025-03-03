@@ -23,7 +23,7 @@ export const NFTGiftList = () => {
 		refetch,
 	} = useGetNFTGiftsQuery({
 		page: currentPage,
-		limit: 10,
+		limit: 5,
 	});
 
 	useEffect(() => {
@@ -31,7 +31,13 @@ export const NFTGiftList = () => {
 			if (currentPage === 1) {
 				setAllGifts(giftResponse.gifts);
 			} else {
-				setAllGifts((prev) => [...prev, ...(giftResponse.gifts || [])]);
+				const existingIds = new Set(allGifts.map((gift) => gift._id));
+
+				const newUniqueGifts = giftResponse.gifts.filter(
+					(gift) => !existingIds.has(gift._id)
+				);
+
+				setAllGifts((prev) => [...prev, ...newUniqueGifts]);
 			}
 
 			setHasMore(currentPage < giftResponse.pagination.totalPages);
