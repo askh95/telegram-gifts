@@ -11,13 +11,23 @@ const SearchResults = () => {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [hasMore, setHasMore] = useState(true);
 	const [isLoadingMore, setIsLoadingMore] = useState(false);
-	const [loadedMoreThanOnePage, setLoadedMoreThanOnePage] = useState(false);
+	const [searchId, setSearchId] = useState(Date.now());
 	const observer = useRef<IntersectionObserver | null>(null);
-	const loaderRef = useRef<HTMLDivElement>(null);
-	const tableRef = useRef<HTMLDivElement>(null);
-	const desktopLoaderRef = useRef<HTMLDivElement>(null);
+	const loaderRef = useRef<HTMLDivElement | null>(null);
+	const tableRef = useRef<HTMLDivElement | null>(null);
+	const desktopLoaderRef = useRef<HTMLDivElement | null>(null);
 
 	const uniqueResultIds = useRef(new Set<string>());
+
+	const queryParams = {
+		name: searchQuery.name || "",
+		model: searchQuery.model || undefined,
+		pattern: searchQuery.pattern || undefined,
+		backdrop: searchQuery.backdrop || undefined,
+		page: currentPage,
+		limit: 20,
+		searchId,
+	};
 
 	const {
 		data: searchResults,
@@ -25,19 +35,23 @@ const SearchResults = () => {
 		isFetching,
 		error,
 		refetch,
-	} = useSearchGiftsQuery(
-		{
-			name: searchQuery.name || "",
-			model: searchQuery.model || undefined,
-			pattern: searchQuery.pattern || undefined,
-			backdrop: searchQuery.backdrop || undefined,
-			page: currentPage,
-			limit: 20,
-		},
-		{
-			skip: !searchQuery.name,
-		}
-	);
+	} = useSearchGiftsQuery(queryParams, {
+		skip: !searchQuery.name,
+		refetchOnMountOrArgChange: true,
+	});
+
+	useEffect(() => {
+		setSearchId(Date.now());
+		setCurrentPage(1);
+		setAllResults([]);
+		setHasMore(true);
+		uniqueResultIds.current.clear();
+	}, [
+		searchQuery.name,
+		searchQuery.model,
+		searchQuery.pattern,
+		searchQuery.backdrop,
+	]);
 
 	useEffect(() => {
 		if (
@@ -47,7 +61,6 @@ const SearchResults = () => {
 		) {
 			if (currentPage === 1) {
 				uniqueResultIds.current.clear();
-				setLoadedMoreThanOnePage(false);
 
 				searchResults.results.forEach((result) => {
 					uniqueResultIds.current.add(`${result.giftNumber}-${result.owner}`);
@@ -55,8 +68,6 @@ const SearchResults = () => {
 
 				setAllResults(searchResults.results);
 			} else {
-				setLoadedMoreThanOnePage(true);
-
 				const newUniqueResults = searchResults.results.filter((result) => {
 					const resultId = `${result.giftNumber}-${result.owner}`;
 					if (!uniqueResultIds.current.has(resultId)) {
@@ -80,19 +91,6 @@ const SearchResults = () => {
 			setIsLoadingMore(false);
 		}
 	}, [searchResults, currentPage]);
-
-	useEffect(() => {
-		setCurrentPage(1);
-		setAllResults([]);
-		setHasMore(true);
-		setLoadedMoreThanOnePage(false);
-		uniqueResultIds.current.clear();
-	}, [
-		searchQuery.name,
-		searchQuery.model,
-		searchQuery.pattern,
-		searchQuery.backdrop,
-	]);
 
 	const lastMobileElementRef = useCallback(
 		(node: HTMLDivElement | null) => {
@@ -160,6 +158,15 @@ const SearchResults = () => {
 		};
 	}, [hasMore, isFetching, isLoadingMore, allResults.length]);
 
+	const handleRetry = () => {
+		setSearchId(Date.now());
+		setCurrentPage(1);
+		setAllResults([]);
+		setHasMore(true);
+		uniqueResultIds.current.clear();
+		refetch();
+	};
+
 	if (!searchQuery.name) {
 		return (
 			<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-4 md:p-6 shadow-lg border border-gray-700/50 mb-6">
@@ -170,7 +177,7 @@ const SearchResults = () => {
 		);
 	}
 
-	if (isInitialLoading && currentPage === 1) {
+	if (isInitialLoading || (isFetching && currentPage === 1)) {
 		return (
 			<div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-4 md:p-6 shadow-lg border border-gray-700/50 mb-6">
 				<div className="flex flex-col items-center justify-center py-12 gap-4">
@@ -197,10 +204,7 @@ const SearchResults = () => {
 						Произошла ошибка при загрузке результатов
 					</p>
 					<button
-						onClick={() => {
-							setCurrentPage(1);
-							refetch();
-						}}
+						onClick={handleRetry}
 						className="mt-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white transition-colors"
 					>
 						Попробовать снова
@@ -421,7 +425,7 @@ const SearchResults = () => {
 					</div>
 				) : hasMore ? (
 					""
-				) : allResults.length > 0 && loadedMoreThanOnePage ? (
+				) : allResults.length > 0 ? (
 					<div className="text-center text-gray-500 text-sm">
 						Больше результатов нет
 					</div>
